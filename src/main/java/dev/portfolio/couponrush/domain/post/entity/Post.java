@@ -32,7 +32,7 @@ public class Post {
     @Column(nullable = false, columnDefinition = "TEXT")
     private String content;
 
-    @ManyToOne(fetch = FetchType.LAZY)  // 쿠폰정보가 필요할 때 조회
+    @ManyToOne(fetch = FetchType.LAZY)  // 게시글 조회 시 쿠폰을 즉시 로딩하지 않기 위해 지연 로딩 사용함
     @JoinColumn(name = "coupon_id")
     private Coupon coupon;
 
@@ -45,12 +45,10 @@ public class Post {
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 
-    // 쿠폰 없는 게시글 생성용
     public Post(String title, String content) {
         this(title, content, null);
     }
 
-    // 쿠폰이 연결된 게시글 생성용
     public Post(String title, String content, Coupon coupon) {
         this.title = title;
         this.content = content;
