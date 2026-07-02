@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: coupon-rush-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: coupon_rush
+      POSTGRES_USER: couponrush
+      POSTGRES_PASSWORD: couponrush
+    volumes:
+      - coupon-rush-postgres-data:/var/lib/postgresql/data
+
+volumes:
+  coupon-rush-postgres-data:
