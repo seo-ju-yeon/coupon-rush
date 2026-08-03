@@ -28,36 +28,46 @@ import static org.junit.jupiter.api.Assertions.fail;
 @SpringBootTest
 @Testcontainers
 @Log4j2
+// 실제 PostgreSQL에서 주문 저장과 쿠폰 중복 사용 제약조건을 검증함
 class OrderRepositoryTest {
 
+    // 테스트 클래스 실행 동안 사용할 PostgreSQL 컨테이너를 정의함
     @Container
     @ServiceConnection
     static PostgreSQLContainer<?> postgreSQLContainer = new PostgreSQLContainer<>("postgres:16");
 
+    // 주문을 저장할 Repository를 실제 Spring Bean으로 주입받음
     @Autowired
     OrderRepository orderRepository;
 
+    // 주문에 사용할 쿠폰 발급 내역을 저장할 Repository를 주입받음
     @Autowired
     CouponIssueRepository couponIssueRepository;
 
+    // 주문에 사용할 쿠폰을 저장할 Repository를 주입받음
     @Autowired
     CouponRepository couponRepository;
 
+    // 주문에 사용할 사용자를 저장할 Repository를 주입받음
     @Autowired
     UserRepository userRepository;
 
+    // JPA가 저장한 실제 DB 원본 값을 확인할 때 사용함
     @Autowired
     JdbcTemplate jdbcTemplate;
 
     @Test
     void saveOrder() {
+        // 외래 키 관계를 만족하도록 사용자, 쿠폰, 발급 내역을 먼저 저장함
         User user = userRepository.saveAndFlush(createUser("order-save@example.com"));
         Coupon coupon = couponRepository.saveAndFlush(createCoupon("주문 저장 테스트 쿠폰"));
         CouponIssue couponIssue = couponIssueRepository.saveAndFlush(new CouponIssue(coupon, user));
+        // 주문을 생성하고 저장함
         Order order = new Order(user, couponIssue, 10_000, 1_000);
 
         Order saved = orderRepository.saveAndFlush(order);
 
+        // 주문 상태와 외래 키가 DB에 올바르게 저장되었는지 확인함
         String savedStatus = jdbcTemplate.queryForObject(
                 "select status from orders where id = ?",
                 String.class,
@@ -81,6 +91,7 @@ class OrderRepositoryTest {
                 saved.getCreatedAt()
         );
 
+        // 주문 금액, 상태, 생성 일시를 검증함
         assertThat(saved.getId()).isNotNull();
         assertThat(saved.getUser().getId()).isEqualTo(user.getId());
         assertThat(saved.getCouponIssue().getId()).isEqualTo(couponIssue.getId());
@@ -95,6 +106,7 @@ class OrderRepositoryTest {
 
     @Test
     void duplicateCouponIssueOrderShouldFail() {
+        // 하나의 발급 쿠폰을 사용한 첫 번째 주문을 저장함
         User user = userRepository.saveAndFlush(createUser("order-duplicate@example.com"));
         Coupon coupon = couponRepository.saveAndFlush(createCoupon("주문 중복 테스트 쿠폰"));
         CouponIssue couponIssue = couponIssueRepository.saveAndFlush(new CouponIssue(coupon, user));
@@ -103,8 +115,10 @@ class OrderRepositoryTest {
         orderRepository.saveAndFlush(firstOrder);
         log.info("첫 번째 주문 저장 성공: couponIssueId={}", couponIssue.getId());
 
+        // 동일한 발급 쿠폰을 다시 사용하는 주문을 준비함
         Order secondOrder = new Order(user, couponIssue, 20_000, 2_000);
 
+        // 발급 쿠폰 하나당 주문 하나만 허용하는 UNIQUE 제약조건을 확인함
         try {
             orderRepository.saveAndFlush(secondOrder);
             fail("예외가 발생해야 하는데 발생하지 않았습니다.");

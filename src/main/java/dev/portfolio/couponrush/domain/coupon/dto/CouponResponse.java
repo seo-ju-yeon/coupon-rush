@@ -7,17 +7,28 @@ import lombok.Getter;
 import java.time.LocalDateTime;
 
 @Getter
+// 쿠폰 정보를 API 응답 형태로 전달하는 DTO임
 public class CouponResponse {
 
+    // 쿠폰의 식별자를 반환함
     private final Long id;
+    // 쿠폰의 이름을 반환함
     private final String name;
+    // 쿠폰의 할인 금액을 반환함
     private final Integer discountAmount;
+    // 쿠폰의 전체 발급 가능 수량을 반환함
     private final Integer totalQuantity;
+    // 현재까지 발급된 쿠폰 수량을 반환함
     private final Integer issuedQuantity;
+    // 쿠폰 발급 시작 일시를 반환함
     private final LocalDateTime startsAt;
+    // 쿠폰 발급 종료 일시를 반환함
     private final LocalDateTime endsAt;
+    // 쿠폰의 현재 상태를 반환함
     private final CouponStatus status;
+    // 쿠폰 생성 일시를 반환함
     private final LocalDateTime createdAt;
+    // 쿠폰 수정 일시를 반환함
     private final LocalDateTime updatedAt;
 
     private CouponResponse(
@@ -45,6 +56,7 @@ public class CouponResponse {
     }
 
     public static CouponResponse from(Coupon coupon) {
+        // Coupon 엔티티를 API 응답용 DTO로 변환함
         return new CouponResponse(
                 coupon.getId(),
                 coupon.getName(),

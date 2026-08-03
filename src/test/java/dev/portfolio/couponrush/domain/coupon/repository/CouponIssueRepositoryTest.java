@@ -25,32 +25,41 @@ import static org.junit.jupiter.api.Assertions.fail;
 @SpringBootTest
 @Testcontainers
 @Log4j2
+// 실제 PostgreSQL에서 쿠폰 발급 내역 저장과 제약조건을 검증함
 class CouponIssueRepositoryTest {
 
+    // 테스트 클래스 실행 동안 사용할 PostgreSQL 컨테이너를 정의함
     @Container
     @ServiceConnection
     static PostgreSQLContainer<?> postgreSQLContainer = new PostgreSQLContainer<>("postgres:16");
 
+    // 쿠폰 발급 내역을 저장할 Repository를 실제 Spring Bean으로 주입받음
     @Autowired
     CouponIssueRepository couponIssueRepository;
 
+    // 테스트용 쿠폰을 저장할 Repository를 실제 Spring Bean으로 주입받음
     @Autowired
     CouponRepository couponRepository;
 
+    // 테스트용 사용자를 저장할 Repository를 실제 Spring Bean으로 주입받음
     @Autowired
     UserRepository userRepository;
 
+    // JPA가 저장한 실제 DB 원본 값을 확인할 때 사용함
     @Autowired
     JdbcTemplate jdbcTemplate;
 
     @Test
     void saveCouponIssue() {
+        // 외래 키 관계를 만족하도록 사용자와 쿠폰을 먼저 저장함
         User user = userRepository.saveAndFlush(createUser("issue-save@example.com"));
         Coupon coupon = couponRepository.saveAndFlush(createCoupon("발급 저장 테스트 쿠폰"));
         CouponIssue couponIssue = new CouponIssue(coupon, user);
 
+        // 쿠폰 발급 내역을 저장하고 즉시 DB에 반영함
         CouponIssue saved = couponIssueRepository.saveAndFlush(couponIssue);
 
+        // JPA 객체 값과 DB에 저장된 원본 값을 비교하기 위해 조회함
         String savedStatus = jdbcTemplate.queryForObject(
                 "select status from coupon_issues where id = ?",
                 String.class,
@@ -86,6 +95,7 @@ class CouponIssueRepositoryTest {
 
     @Test
     void duplicateCouponIssueShouldFail() {
+        // 동일한 쿠폰과 사용자의 첫 번째 발급 내역을 저장함
         User user = userRepository.saveAndFlush(createUser("issue-duplicate@example.com"));
         Coupon coupon = couponRepository.saveAndFlush(createCoupon("중복 발급 테스트 쿠폰"));
 
@@ -95,6 +105,7 @@ class CouponIssueRepositoryTest {
 
         CouponIssue secondIssue = new CouponIssue(coupon, user);
 
+        // UNIQUE 제약조건으로 중복 발급이 차단되는지 확인함
         try {
             couponIssueRepository.saveAndFlush(secondIssue);
             fail("예외가 발생해야 하는데 발생하지 않았습니다.");

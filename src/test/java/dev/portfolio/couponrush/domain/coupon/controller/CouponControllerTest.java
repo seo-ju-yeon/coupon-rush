@@ -26,25 +26,31 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @Testcontainers
 @AutoConfigureMockMvc
+// MockMvc로 쿠폰 API 요청을 보내 Controller의 응답을 검증함
 class CouponControllerTest {
 
+    // 테스트 클래스 실행 동안 사용할 PostgreSQL 컨테이너를 정의함
     @Container
     @ServiceConnection
     static PostgreSQLContainer<?> postgreSQLContainer = new PostgreSQLContainer<>("postgres:16");
 
+    // Controller에 HTTP 요청을 보내는 테스트 도구를 주입받음
     @Autowired
     MockMvc mockMvc;
 
+    // 테스트 간 쿠폰 데이터를 정리할 Repository를 주입받음
     @Autowired
     CouponRepository couponRepository;
 
     @BeforeEach
     void setUp() {
+        // 각 테스트가 독립적으로 실행되도록 기존 쿠폰을 삭제함
         couponRepository.deleteAll();
     }
 
     @Test
     void createCoupon() throws Exception {
+        // 쿠폰 생성 API에 전달할 JSON 요청을 준비함
         String requestBody = """
                 {
                 "name": "선착순 할인 쿠폰",
@@ -55,6 +61,7 @@ class CouponControllerTest {
                 }
                 """;
 
+        // POST 요청을 보내고 생성 응답을 검증함
         mockMvc.perform(post("/api/coupons")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody))
@@ -74,6 +81,7 @@ class CouponControllerTest {
 
     @Test
     void getCoupons() throws Exception {
+        // 목록에 저장할 쿠폰 생성 요청 두 개를 준비함
         String firstRequest = """
                 {
                   "name": "첫 번째 쿠폰",
@@ -94,6 +102,7 @@ class CouponControllerTest {
                 }
                 """;
 
+        // 쿠폰 두 개를 생성함
         mockMvc.perform(post("/api/coupons")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(firstRequest))
@@ -104,6 +113,7 @@ class CouponControllerTest {
                         .content(secondRequest))
                 .andExpect(status().isCreated());
 
+        // 목록 조회 API가 두 개의 쿠폰을 반환하는지 검증함
         mockMvc.perform(get("/api/coupons"))
                 .andDo(print())
                 .andExpect(status().isOk())
@@ -114,6 +124,7 @@ class CouponControllerTest {
 
     @Test
     void createCouponWithInvalidRequestFails() throws Exception {
+        // 필수값 누락과 범위 오류가 포함된 잘못된 JSON 요청을 준비함
         String requestBody = """
                 {
                   "name": "",
@@ -124,6 +135,7 @@ class CouponControllerTest {
                 }
                 """;
 
+        // 요청값 검증 실패 시 400 응답과 공통 오류 코드를 반환하는지 검증함
         mockMvc.perform(post("/api/coupons")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody))
@@ -136,8 +148,10 @@ class CouponControllerTest {
 
     @Test
     void getCouponWithNotFoundCouponFails() throws Exception {
+        // 존재하지 않는 쿠폰 ID를 준비함
         Long notFoundCouponId = 999L;
 
+        // 없는 쿠폰 조회 시 공통 예외 응답을 반환하는지 검증함
         mockMvc.perform(get("/api/coupons/{couponId}", notFoundCouponId))
                 .andDo(print())
                 .andExpect(status().isNotFound())

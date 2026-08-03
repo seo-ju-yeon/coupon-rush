@@ -26,26 +26,31 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 @Testcontainers
 @Log4j2
+// MockMvc로 사용자 API 요청을 보내 Controller의 응답을 검증함
 class UserControllerTest {
 
+    // 테스트 클래스 실행 동안 사용할 PostgreSQL 컨테이너를 정의함
     @Container
     @ServiceConnection
     static PostgreSQLContainer<?> postgreSQLContainer = new PostgreSQLContainer<>("postgres:16");
 
-    // Controller 테스트에 필요한 스프링 빈을 실제 애플리케이션 컨텍스트에서 주입받음
+    // Controller 테스트에 필요한 Spring Bean을 실제 애플리케이션 컨텍스트에서 주입받음
     @Autowired
     MockMvc mockMvc;
 
+    // 테스트 간 사용자 데이터를 정리할 Repository를 주입받음
     @Autowired
     UserRepository userRepository;
 
     @BeforeEach
     void setUp() {
+        // 각 테스트가 독립적으로 실행되도록 기존 사용자를 삭제함
         userRepository.deleteAll();
     }
 
     @Test
     void createUser() throws Exception {
+        // 사용자 생성 API에 전달할 JSON 요청을 준비함
         String requestBody = """
                 {
                   "email": "controller-create@example.com",
@@ -53,6 +58,7 @@ class UserControllerTest {
                 }
                 """;
 
+        // POST 요청을 보내고 생성 응답을 검증함
         mockMvc.perform(post("/api/users")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody))
@@ -68,8 +74,10 @@ class UserControllerTest {
 
     @Test
     void getUser() throws Exception {
+        // 조회할 사용자를 데이터베이스에 먼저 저장함
         User user = userRepository.saveAndFlush(new User("controller-get@example.com", "tester"));
 
+        // 사용자 단건 조회 API를 호출하고 응답을 검증함
         mockMvc.perform(get("/api/users/{userId}", user.getId()))
                 .andDo(print())
                 .andExpect(status().isOk())
@@ -83,6 +91,7 @@ class UserControllerTest {
 
     @Test
     void createUserWithInvalidEmailFails() throws Exception {
+        // 이메일 형식이 잘못된 JSON 요청을 준비함
         String requestBody = """
                 {
                   "email": "invalid-email",
@@ -90,6 +99,7 @@ class UserControllerTest {
                 }
                 """;
 
+        // 요청값 검증 실패 시 공통 오류 응답을 반환하는지 검증함
         mockMvc.perform(post("/api/users")
                         .contentType(MediaType.APPLICATION_JSON)
                 .content(requestBody))
@@ -103,8 +113,10 @@ class UserControllerTest {
 
     @Test
     void createUserWithDuplicateEmailFails() throws Exception {
+        // 중복 이메일을 가진 기존 사용자를 먼저 저장함
         userRepository.saveAndFlush(new User("controller-duplicate@example.com", "tester1"));
 
+        // 동일한 이메일로 다시 생성 요청할 JSON을 준비함
         String requestBody = """
                 {
                   "email": "controller-duplicate@example.com",
@@ -112,6 +124,7 @@ class UserControllerTest {
                 }
                 """;
 
+        // 중복 이메일 요청이 409 오류로 처리되는지 검증함
         mockMvc.perform(post("/api/users")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody))
@@ -125,8 +138,10 @@ class UserControllerTest {
 
     @Test
     void getUserWithNotFoundUserFails() throws Exception {
+        // 존재하지 않는 사용자 ID를 준비함
         Long notFoundUserId = 999L;
 
+        // 없는 사용자 조회 시 공통 오류 응답을 반환하는지 검증함
         mockMvc.perform(get("/api/users/{userId}", notFoundUserId))
                 .andDo(print())
                 .andExpect(status().isNotFound())

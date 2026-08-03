@@ -19,20 +19,25 @@ import static org.assertj.core.api.Assertions.assertThat;
 @SpringBootTest
 @Testcontainers
 @Log4j2
+// 실제 PostgreSQL에서 쿠폰 엔티티의 저장 결과를 검증함
 class CouponRepositoryTest {
 
+    // 테스트 클래스 실행 동안 사용할 PostgreSQL 컨테이너를 정의함
     @Container
     @ServiceConnection
     static PostgreSQLContainer<?> postgreSQLContainer = new PostgreSQLContainer<>("postgres:16");
 
+    // 쿠폰을 저장할 Repository를 실제 Spring Bean으로 주입받음
     @Autowired
     CouponRepository couponRepository;
 
+    // JPA가 저장한 실제 DB 원본 값을 확인할 때 사용함
     @Autowired
-    JdbcTemplate jdbcTemplate;  // DB에 저장된 원본 값 확인
+    JdbcTemplate jdbcTemplate;
 
     @Test
     void saveCoupon() {
+        // 저장에 필요한 쿠폰 엔티티를 생성함
         Coupon coupon = new Coupon(
                 "선착순 할인 쿠폰",
                 1000,
@@ -44,7 +49,7 @@ class CouponRepositoryTest {
 
         Coupon saved = couponRepository.saveAndFlush(coupon);
 
-        // enum 타입이 상수인지, 문자열인지 확인
+        // enum이 DB에 문자열로 저장되었는지 확인함
         String savedStatus = jdbcTemplate.queryForObject(
                 "select status from coupons where id = ?",
                 String.class,
@@ -61,6 +66,7 @@ class CouponRepositoryTest {
                 saved.getUpdatedAt()
         );
 
+        // ID 생성, enum 변환, 기본값, 생성·수정 일시를 검증함
         assertThat(saved.getId()).isNotNull();
         assertThat(saved.getStatus()).isEqualTo(CouponStatus.OPEN);
         assertThat(savedStatus).isEqualTo("OPEN");

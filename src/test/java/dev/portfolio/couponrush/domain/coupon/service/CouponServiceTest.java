@@ -26,27 +26,32 @@ import static org.junit.jupiter.api.Assertions.fail;
 @SpringBootTest
 @Testcontainers
 @Log4j2
+// 실제 Spring Context와 PostgreSQL을 사용하여 쿠폰 Service를 검증함
 class CouponServiceTest {
 
+    // 테스트 클래스 실행 동안 사용할 PostgreSQL 컨테이너를 정의함
     @Container
     @ServiceConnection
     static PostgreSQLContainer<?> postgreSQLContainer =
             new PostgreSQLContainer<>("postgres:16");
 
+    // 테스트 대상 Service를 실제 Spring Bean으로 주입받음
     @Autowired
     CouponService couponService;
 
+    // 테스트 데이터 정리에 사용할 Repository를 실제 Spring Bean으로 주입받음
     @Autowired
     CouponRepository couponRepository;
 
     @BeforeEach
     void setUp() {
+        // 테스트 간 쿠폰 데이터가 섞이지 않도록 기존 데이터를 삭제함
         couponRepository.deleteAll();
     }
 
     @Test
     void createCoupon() {
-        // 쿠폰 생성 성공 확인
+        // 쿠폰 생성 요청을 준비함
         CouponCreateRequest request = createRequest(
                 "선착순 할인 쿠폰",
                 1000,
@@ -55,6 +60,7 @@ class CouponServiceTest {
                 LocalDateTime.now().plusDays(1)
         );
 
+        // Service를 호출하여 쿠폰을 생성함
         CouponResponse response = couponService.createCoupon(request);
 
         log.info(
@@ -65,6 +71,7 @@ class CouponServiceTest {
                 response.getIssuedQuantity()
         );
 
+        // 생성된 쿠폰의 기본값과 응답 변환 결과를 검증함
         assertThat(response.getId()).isNotNull();
         assertThat(response.getName()).isEqualTo("선착순 할인 쿠폰");
         assertThat(response.getDiscountAmount()).isEqualTo(1000);
@@ -77,7 +84,7 @@ class CouponServiceTest {
 
     @Test
     void getCoupon() {
-        // 쿠폰 단건 조회 확인
+        // 조회할 쿠폰의 생성 요청을 준비함
         CouponCreateRequest request = createRequest(
                 "조회 테스트 쿠폰",
                 2000,
@@ -86,6 +93,7 @@ class CouponServiceTest {
                 LocalDateTime.now().plusDays(1)
         );
 
+        // 쿠폰을 생성한 뒤 ID로 다시 조회함
         CouponResponse createdCoupon = couponService.createCoupon(request);
         CouponResponse foundCoupon =
                 couponService.getCoupon(createdCoupon.getId());
@@ -96,6 +104,7 @@ class CouponServiceTest {
                 foundCoupon.getName()
         );
 
+        // 생성한 쿠폰과 조회한 쿠폰의 값이 일치하는지 검증함
         assertThat(foundCoupon.getId()).isEqualTo(createdCoupon.getId());
         assertThat(foundCoupon.getName()).isEqualTo("조회 테스트 쿠폰");
         assertThat(foundCoupon.getDiscountAmount()).isEqualTo(2000);
@@ -103,7 +112,7 @@ class CouponServiceTest {
 
     @Test
     void getCoupons() {
-        // 쿠폰 목록 조회 확인
+        // 목록 조회를 위한 쿠폰 두 개를 준비함
         CouponCreateRequest firstRequest = createRequest(
                 "첫 번째 쿠폰",
                 1000,
@@ -120,13 +129,16 @@ class CouponServiceTest {
                 LocalDateTime.now().plusDays(1)
         );
 
+        // 쿠폰 두 개를 생성함
         couponService.createCoupon(firstRequest);
         couponService.createCoupon(secondRequest);
 
+        // 쿠폰 목록을 조회함
         List<CouponResponse> responses = couponService.getCoupons();
 
         log.info("쿠폰 목록 조회 성공: count={}", responses.size());
 
+        // 생성한 쿠폰 두 개가 목록에 포함되었는지 검증함
         assertThat(responses).hasSize(2);
         assertThat(responses)
                 .extracting(CouponResponse::getName)
@@ -135,9 +147,10 @@ class CouponServiceTest {
 
     @Test
     void getCouponWithNotFoundCouponFails() {
-        // 없는 쿠폰 조회 시 예외 확인
+        // 존재하지 않는 쿠폰 ID를 준비함
         Long notFoundCouponId = 999L;
 
+        // 없는 쿠폰 조회 시 비즈니스 예외가 발생하는지 확인함
         try {
             couponService.getCoupon(notFoundCouponId);
             fail("예외가 발생해야 하는데 발생하지 않았습니다.");
@@ -155,7 +168,7 @@ class CouponServiceTest {
 
     @Test
     void createCouponWithInvalidPeriodFails() {
-        // 시작일과 종료일이 잘못된 경우 예외 확인
+        // 종료일이 시작일보다 빠른 잘못된 기간을 준비함
         LocalDateTime startsAt = LocalDateTime.now().plusDays(1);
         LocalDateTime endsAt = LocalDateTime.now();
 
@@ -167,6 +180,7 @@ class CouponServiceTest {
                 endsAt
         );
 
+        // 잘못된 기간으로 쿠폰 생성 시 예외가 발생하는지 확인함
         try {
             couponService.createCoupon(request);
             fail("예외가 발생해야 하는데 발생하지 않았습니다.");
@@ -188,9 +202,9 @@ class CouponServiceTest {
             LocalDateTime startsAt,
             LocalDateTime endsAt
     ) {
+        // setter 없이 테스트 요청 DTO의 private 필드에 값을 주입함
         CouponCreateRequest request = new CouponCreateRequest();
 
-        // ReflectionTestUtils를 사용하는 이유는 CouponCreateRequest에 setter가 없기 때문
         ReflectionTestUtils.setField(request, "name", name);
         ReflectionTestUtils.setField(request, "discountAmount", discountAmount);
         ReflectionTestUtils.setField(request, "totalQuantity", totalQuantity);

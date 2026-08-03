@@ -11,23 +11,29 @@ import java.time.LocalDateTime;
 
 @Getter
 @NoArgsConstructor
+// 쿠폰 생성 API의 요청 데이터를 담는 DTO임
 public class CouponCreateRequest {
 
+    // 쿠폰 생성 시 입력받을 쿠폰 이름을 검증함
     @NotBlank(message = "쿠폰 이름은 필수입니다.")
     @Size(max = 100, message = "쿠폰 이름은 100자를 초과할 수 없습니다.")
     private String name;
 
+    // 쿠폰 1장에 적용할 할인 금액을 검증함
     @NotNull(message = "할인 금액은 필수입니다.")
     @Positive(message = "할인 금액은 0보다 커야 합니다.")
     private Integer discountAmount;
 
+    // 쿠폰을 발급할 수 있는 전체 수량을 검증함
     @NotNull(message = "총 발급 수량은 필수입니다.")
     @Positive(message = "총 발급 수량은 0보다 커야 합니다.")
     private Integer totalQuantity;
 
+    // 쿠폰 발급 시작 일시를 검증함
     @NotNull(message = "발급 시작 일시는 필수입니다.")
     private LocalDateTime startsAt;
 
+    // 쿠폰 발급 종료 일시를 검증함
     @NotNull(message = "발급 종료 일시는 필수입니다.")
     private LocalDateTime endsAt;
 }
