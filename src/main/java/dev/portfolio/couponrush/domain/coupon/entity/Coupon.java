@@ -1,5 +1,7 @@
 package dev.portfolio.couponrush.domain.coupon.entity;
 
+import dev.portfolio.couponrush.common.exception.BusinessException;
+import dev.portfolio.couponrush.common.exception.ErrorCode;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -66,5 +68,14 @@ public class Coupon {
         this.status = status;
         this.createdAt = LocalDateTime.now();
         this.updatedAt = LocalDateTime.now();
+    }
+
+    // 쿠폰 발급 수량을 1 증가시킴
+    public void increaseIssueQuantity() {
+        if (issuedQuantity >= totalQuantity) {
+            throw new BusinessException(ErrorCode.COUPON_SOLD_OUT);
+        }
+
+        issuedQuantity++;
     }
 }
