@@ -25,7 +25,14 @@ import java.time.LocalDateTime;
 public class CouponIssueService {
     /*
     처리 흐름:
-    쿠폰 조회 -> 사용자 조회 -> 쿠폰 상태 확인 -> 발급 기간 확인 -> 중복 발급 확인 -> 쿠폰 수량 증가 -> CouponIssue 저장 -> 응답 DTO 반환
+    1. 쿠폰 조회
+    2. 사용자 조회
+    3. 쿠폰 상태 확인
+    4. 발급 기간 확인
+    5. 중복 발급 확인
+    6. 쿠폰 수량 증가
+    7. CouponIssue 저장
+    8. 응답 DTO 반환
      */
 
     private final CouponIssueRepository couponIssueRepository;
@@ -39,7 +46,8 @@ public class CouponIssueService {
     ) {
         log.info("쿠폰 발급 요청: couponId={}, userId={}", couponId, request.getUserId());
 
-        Coupon coupon = couponRepository.findById(couponId)
+        // 같은 쿠폰 발급 요청을 순차 처리하기 위해 비관적 락으로 쿠폰을 조회함
+        Coupon coupon = couponRepository.findByIdWithPessimisticLock(couponId)
                 .orElseThrow(() -> new BusinessException(
                         ErrorCode.COUPON_NOT_FOUND
                 ));

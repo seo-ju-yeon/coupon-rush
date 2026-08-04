@@ -1,5 +1,7 @@
 package dev.portfolio.couponrush.domain.coupon.service;
 
+import dev.portfolio.couponrush.common.exception.BusinessException;
+import dev.portfolio.couponrush.common.exception.ErrorCode;
 import dev.portfolio.couponrush.domain.coupon.dto.CouponIssueCreateRequest;
 import dev.portfolio.couponrush.domain.coupon.entity.Coupon;
 import dev.portfolio.couponrush.domain.coupon.entity.CouponStatus;
@@ -109,7 +111,12 @@ class CouponConcurrencyTest {
         AtomicInteger failureCount = new AtomicInteger();
 
         // 실패한 예외 유형을 여러 스레드에서 안전하게 기록함
+        // failureTypes: 예상한 품절 실패인지 기록
         List<String> failureTypes = Collections.synchronizedList(new ArrayList<>());
+
+        // 비즈니스 예외로 실패한 요청의 에러 코드를 안전하게 기록함
+        // failureCodes: 품절 외에 예상하지 못한 기술 예외가 발생했는지 기록
+        List<ErrorCode> failureCodes = Collections.synchronizedList(new ArrayList<>());
 
         try {
             for (User user : users) {
@@ -129,12 +136,21 @@ class CouponConcurrencyTest {
                                 request);
 
                         successCount.incrementAndGet();
+                    } catch (BusinessException e) {
+                        failureCount.incrementAndGet();
+                        failureCodes.add(e.getErrorCode());
+
+                        log.info(
+                                "동시 발급 요청 실패: userId={}, errorCode={}",
+                                user.getId(),
+                                e.getErrorCode()
+                        );
                     } catch (Exception e) {
                         failureCount.incrementAndGet();
                         failureTypes.add(e.getClass().getSimpleName());
 
                         log.info(
-                                "동시 발급 요청 실패: userId={}, exception={}",
+                                "예상하지 못한 동시 발급 요청 실패: userId={}, exception={}",
                                 user.getId(),
                                 e.getClass().getSimpleName()
                         );
@@ -173,36 +189,49 @@ class CouponConcurrencyTest {
         long issuedCouponCount = couponIssueRepository.count();
 
         log.info(
-                "동시 발급 결과: requestCount={}, successCount={}, " +
-                        "failureCount={}, issuedQuantity={}, issueCount={}, failureTypes={}",
+                "비관적 락 동시 발급 결과: requestCount={}, successCount={}, " +
+                        "failureCount={}, issuedQuantity={}, issueCount={}, " +
+                        "failureCodes={}, failureTypes={}",
                 requestCount,
                 successCount.get(),
                 failureCount.get(),
                 updatedCoupon.getIssuedQuantity(),
                 issuedCouponCount,
+                failureCodes.stream().distinct().toList(),
                 failureTypes.stream().distinct().toList()
         );
 
         /*
-         * Coupon의 @Version으로 인해 같은 쿠폰을 동시에 수정한 요청은 낙관적 락 충돌로 실패할 수 있음
-         * 따라서 성공 요청 수가 총 발급 수량과 같은지는 검증하지 않고, 최종 데이터의 일관성을 검증함
+         * 비관적 락으로 같은 쿠폰의 발급 요청을 순차 처리함
+         * 따라서 재고 수량만큼 정확히 성공하고, 나머지 요청은 품절로 실패해야 함
          */
 
-        // 요청 전체 수가 성공과 실패 수의 합과 같은지 검증함
-        assertThat(successCount.get() + failureCount.get())
-                .isEqualTo(requestCount);
-
-        // 쿠폰 발급 수량이 총 발급 가능 수량을 초과하지 않는지 검증함
-        assertThat(updatedCoupon.getIssuedQuantity())
-                .isLessThanOrEqualTo(totalQuantity);
-
-        // 쿠폰의 발급 수량과 실제 발급 내역 수가 같은지 검증함
-        assertThat((long) updatedCoupon.getIssuedQuantity())
-                .isEqualTo(issuedCouponCount);
-
-        // 성공한 요청 수와 실제 저장된 발급 내역 수가 같은지 검증함
+        // 비관적 락으로 요청을 순차 처리하므로 재고 수량만큼 정확히 발급되어야 함
         assertThat(successCount.get())
-                .isEqualTo((int) issuedCouponCount);
+                .isEqualTo(totalQuantity);
+
+        // 재고를 초과한 요청은 모두 품절로 실패해야 함
+        assertThat(failureCount.get())
+                .isEqualTo(requestCount - totalQuantity);
+
+        // 쿠폰 발급 수량과 실제 발급 내역 수가 총 수량과 같아야 함
+        assertThat(updatedCoupon.getIssuedQuantity())
+                .isEqualTo(totalQuantity);
+
+        assertThat(issuedCouponCount)
+                .isEqualTo((long) totalQuantity);
+
+        // 실패한 비즈니스 예외는 모두 품절 예외여야 함
+        assertThat(failureCodes.size())
+                .isEqualTo(requestCount - totalQuantity);
+
+        assertThat(failureCodes.stream()
+                .allMatch(errorCode -> errorCode == ErrorCode.COUPON_SOLD_OUT))
+                .isTrue();
+
+        // 품절 외의 예상하지 못한 기술 예외가 없어야 함
+        assertThat(failureTypes.size())
+                .isEqualTo(0);
     }
 
     private CouponIssueCreateRequest createRequest(Long userId) {
