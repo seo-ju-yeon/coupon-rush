@@ -13,6 +13,10 @@ public enum ErrorCode {
     COUPON_SOLD_OUT(HttpStatus.CONFLICT, "쿠폰 수량이 모두 소진되었습니다."),
     COUPON_NOT_OPEN(HttpStatus.CONFLICT, "현재 발급할 수 없는 쿠폰입니다."),
     DUPLICATE_COUPON_ISSUE(HttpStatus.CONFLICT, "이미 발급받은 쿠폰입니다."),
+    COUPON_ISSUE_NOT_USABLE(HttpStatus.CONFLICT, "사용할 수 없는 쿠폰 발급 내역입니다."),
+    COUPON_ISSUE_USER_MISMATCH(HttpStatus.FORBIDDEN, "쿠폰 발급 사용자와 주문 사용자가 일치하지 않습니다."),
+    INVALID_ORDER_AMOUNT(HttpStatus.BAD_REQUEST, "주문 금액은 할인 금액보다 크거나 같아야 합니다."),
+    COUPON_ISSUE_NOT_FOUND(HttpStatus.NOT_FOUND, "쿠폰 발급 내역을 찾을 수 없습니다."),
     VALIDATION_ERROR(HttpStatus.BAD_REQUEST, "요청 값이 올바르지 않습니다.");
 
     private final HttpStatus status;

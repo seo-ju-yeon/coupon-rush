@@ -1,5 +1,7 @@
 package dev.portfolio.couponrush.domain.coupon.entity;
 
+import dev.portfolio.couponrush.common.exception.BusinessException;
+import dev.portfolio.couponrush.common.exception.ErrorCode;
 import dev.portfolio.couponrush.domain.user.entity.User;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -66,5 +68,16 @@ public class CouponIssue {
         this.user = user;
         this.status = CouponIssueStatus.ISSUED;
         this.issuedAt = LocalDateTime.now();
+    }
+
+    // 쿠폰 발급 내역을 사용 완료 상태로 변경함
+    public void markUsed(Long orderId) {
+        if (status != CouponIssueStatus.ISSUED) {
+            throw new BusinessException(ErrorCode.COUPON_ISSUE_NOT_USABLE);
+        }
+
+        this.status = CouponIssueStatus.USED;
+        this.usedAt = LocalDateTime.now();
+        this.usedOrderId = orderId;
     }
 }
