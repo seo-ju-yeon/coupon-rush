@@ -47,6 +47,11 @@ public class Coupon {
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
+    /*
+     * 같은 쿠폰을 여러 트랜잭션이 수정할 때 변경 충돌을 감지함
+     * 저장 시 조회 시점의 version도 함께 비교하며, 먼저 변경된 뒤의 요청은 예외와 함께 롤백됨
+     * DB 행을 선점하지 않고 저장 시점에 충돌을 판단하는 낙관적 락 방식임
+     */
     @Version
     @Column(nullable = false)
     private Long version;
