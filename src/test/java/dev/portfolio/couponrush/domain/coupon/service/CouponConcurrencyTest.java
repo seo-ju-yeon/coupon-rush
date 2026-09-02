@@ -15,6 +15,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
@@ -30,8 +31,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
 
 @Log4j2
 @Testcontainers
@@ -65,7 +65,7 @@ class CouponConcurrencyTest {
     }
 
     @Test
-    void issueCouponConcurrently() throws InterruptedException {
+    void issueCouponConcurrentlyWithOptimisticLock() throws InterruptedException {
         int totalQuantity = 5;
         int requestCount = 20;
 
@@ -106,17 +106,23 @@ class CouponConcurrencyTest {
         // 모든 스레드의 작업 완료를 기다리기 위한 카운터임
         CountDownLatch doneLatch = new CountDownLatch(requestCount);
 
-        // 성공과 실패한 요청 수를 여러 스레드에서 안전하게 집계함
+        // 성공한 요청 수를 여러 스레드에서 안전하게 집계함
         AtomicInteger successCount = new AtomicInteger();
-        AtomicInteger failureCount = new AtomicInteger();
 
-        // 실패한 예외 유형을 여러 스레드에서 안전하게 기록함
-        // failureTypes: 예상한 품절 실패인지 기록
-        List<String> failureTypes = Collections.synchronizedList(new ArrayList<>());
+        // 품절과 같은 비즈니스 규칙으로 실패한 요청 수를 집계함
+        AtomicInteger businessFailureCount = new AtomicInteger();
 
-        // 비즈니스 예외로 실패한 요청의 에러 코드를 안전하게 기록함
-        // failureCodes: 품절 외에 예상하지 못한 기술 예외가 발생했는지 기록
-        List<ErrorCode> failureCodes = Collections.synchronizedList(new ArrayList<>());
+        // @Version 값의 충돌로 실패한 요청 수를 집계함
+        AtomicInteger optimisticLockFailureCount = new AtomicInteger();
+
+        // 예상하지 못한 예외로 실패한 요청 수를 집계함
+        AtomicInteger unexpectedFailureCount = new AtomicInteger();
+
+        // 품절과 같은 비즈니스 예외의 에러 코드를 여러 스레드에서 안전하게 기록함
+        List<ErrorCode> businessFailureCodes = Collections.synchronizedList(new ArrayList<>());
+
+        // 예상하지 못한 기술 예외의 클래스명을 여러 스레드에서 안전하게 기록함
+        List<String> unexpectedFailureTypes = Collections.synchronizedList(new ArrayList<>());
 
         try {
             for (User user : users) {
@@ -137,20 +143,28 @@ class CouponConcurrencyTest {
 
                         successCount.incrementAndGet();
                     } catch (BusinessException e) {
-                        failureCount.incrementAndGet();
-                        failureCodes.add(e.getErrorCode());
+                        businessFailureCount.incrementAndGet();
+                        businessFailureCodes.add(e.getErrorCode());
 
                         log.info(
-                                "동시 발급 요청 실패: userId={}, errorCode={}",
+                                "쿠폰 발급 비즈니스 예외: userId={}, errorCode={}",
                                 user.getId(),
                                 e.getErrorCode()
                         );
-                    } catch (Exception e) {
-                        failureCount.incrementAndGet();
-                        failureTypes.add(e.getClass().getSimpleName());
+                    } catch (OptimisticLockingFailureException e) {
+                        optimisticLockFailureCount.incrementAndGet();
 
                         log.info(
-                                "예상하지 못한 동시 발급 요청 실패: userId={}, exception={}",
+                                "낙관적 락 충돌 발생: userId={}, exception={}",
+                                user.getId(),
+                                e.getClass().getSimpleName()
+                        );
+                    } catch (Exception e) {
+                        unexpectedFailureCount.incrementAndGet();
+                        unexpectedFailureTypes.add(e.getClass().getSimpleName());
+
+                        log.info(
+                                "예상하지 못한 쿠폰 발급 실패: userId={}, exception={}",
                                 user.getId(),
                                 e.getClass().getSimpleName()
                         );
@@ -188,50 +202,68 @@ class CouponConcurrencyTest {
 
         long issuedCouponCount = couponIssueRepository.count();
 
+        int totalFailureCount =
+                businessFailureCount.get()
+                        + optimisticLockFailureCount.get()
+                        + unexpectedFailureCount.get();
+
         log.info(
-                "비관적 락 동시 발급 결과: requestCount={}, successCount={}, " +
-                        "failureCount={}, issuedQuantity={}, issueCount={}, " +
-                        "failureCodes={}, failureTypes={}",
+                "낙관적 락 동시 발급 결과: requestCount={}, successCount={}, " +
+                        "businessFailureCount={}, optimisticLockFailureCount={}, " +
+                        "unexpectedFailureCount={}, issuedQuantity={}, issueCount={}, " +
+                        "businessFailureCodes={}, unexpectedFailureTypes={}",
                 requestCount,
                 successCount.get(),
-                failureCount.get(),
+                businessFailureCount.get(),
+                optimisticLockFailureCount.get(),
+                unexpectedFailureCount.get(),
                 updatedCoupon.getIssuedQuantity(),
                 issuedCouponCount,
-                failureCodes.stream().distinct().toList(),
-                failureTypes.stream().distinct().toList()
+                businessFailureCodes.stream().distinct().toList(),
+                unexpectedFailureTypes.stream().distinct().toList()
         );
 
         /*
-         * 비관적 락으로 같은 쿠폰의 발급 요청을 순차 처리함
-         * 따라서 재고 수량만큼 정확히 성공하고, 나머지 요청은 품절로 실패해야 함
+         * 낙관적 락은 요청을 순서대로 대기시키지 않음
+         * 같은 version을 수정한 요청 중 하나만 성공하고 나머지는 충돌로 실패할 수 있음
+         * 따라서 정확히 5건 성공하는지가 아니라 최종 데이터의 일관성을 검증함
          */
 
-        // 비관적 락으로 요청을 순차 처리하므로 재고 수량만큼 정확히 발급되어야 함
+        // 모든 요청이 성공 또는 실패로 처리되었는지 검증함
+        assertThat(successCount.get() + totalFailureCount)
+                .isEqualTo(requestCount);
+
+        // 적어도 하나는 성공하고 총 발급 가능 수량을 초과하지 않는지 검증함
         assertThat(successCount.get())
-                .isEqualTo(totalQuantity);
+                .isBetween(1, totalQuantity);
 
-        // 재고를 초과한 요청은 모두 품절로 실패해야 함
-        assertThat(failureCount.get())
-                .isEqualTo(requestCount - totalQuantity);
-
-        // 쿠폰 발급 수량과 실제 발급 내역 수가 총 수량과 같아야 함
+        // 쿠폰 발급 수량이 총 발급 가능 수량을 초과하지 않는지 검증함
         assertThat(updatedCoupon.getIssuedQuantity())
-                .isEqualTo(totalQuantity);
+                .isLessThanOrEqualTo(totalQuantity);
 
-        assertThat(issuedCouponCount)
-                .isEqualTo((long) totalQuantity);
+        // 쿠폰의 발급 수량과 실제 발급 내역 수가 같은지 검증함
+        assertThat((long) updatedCoupon.getIssuedQuantity())
+                .isEqualTo(issuedCouponCount);
 
-        // 실패한 비즈니스 예외는 모두 품절 예외여야 함
-        assertThat(failureCodes.size())
-                .isEqualTo(requestCount - totalQuantity);
+        // 성공한 요청 수와 실제 저장된 발급 내역 수가 같은지 검증함
+        assertThat(successCount.get())
+                .isEqualTo((int) issuedCouponCount);
 
-        assertThat(failureCodes.stream()
+        // 비즈니스 예외가 발생했다면 모두 품절 예외인지 검증함
+        assertThat(businessFailureCodes.stream()
                 .allMatch(errorCode -> errorCode == ErrorCode.COUPON_SOLD_OUT))
                 .isTrue();
 
-        // 품절 외의 예상하지 못한 기술 예외가 없어야 함
-        assertThat(failureTypes.size())
+        // 동시 요청에서 실제 낙관적 락 충돌이 발생했는지 검증함
+        assertThat(optimisticLockFailureCount.get())
+                .isGreaterThan(0);
+
+        // 분류되지 않은 예상 밖의 예외가 없어야 함
+        assertThat(unexpectedFailureCount.get())
                 .isEqualTo(0);
+
+        assertThat(unexpectedFailureTypes)
+                .isEmpty();
     }
 
     private CouponIssueCreateRequest createRequest(Long userId) {

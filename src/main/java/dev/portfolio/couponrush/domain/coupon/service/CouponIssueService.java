@@ -46,8 +46,8 @@ public class CouponIssueService {
     ) {
         log.info("쿠폰 발급 요청: couponId={}, userId={}", couponId, request.getUserId());
 
-        // 같은 쿠폰 발급 요청을 순차 처리하기 위해 비관적 락으로 쿠폰을 조회함
-        Coupon coupon = couponRepository.findByIdWithPessimisticLock(couponId)
+        // DB 행을 잠그지 않고 조회하며 저장 시 @Version으로 변경 충돌을 감지함
+        Coupon coupon = couponRepository.findById(couponId)
                 .orElseThrow(() -> new BusinessException(
                         ErrorCode.COUPON_NOT_FOUND
                 ));
