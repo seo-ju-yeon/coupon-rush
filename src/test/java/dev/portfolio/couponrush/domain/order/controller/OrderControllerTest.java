@@ -16,6 +16,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
@@ -57,11 +58,17 @@ class OrderControllerTest {
     @Autowired
     UserRepository userRepository;  // 사용자 저장
 
+    @Autowired
+    JdbcTemplate jdbcTemplate; // 테스트 준비 과정에서 SQL을 직접 실행하기 위해 사용
+
     @BeforeEach
     void setUp() {
-        // 외래 키 제약조건을 고려하여 주문부터 삭제함
+        // 기존에는 외래 키 제약조건을 고려해 주문부터 삭제했으나 순환 참조로 실패함
+        // used_order_id 참조를 먼저 해제한 후 주문부터 역순으로 테스트 데이터를 삭제함
+        jdbcTemplate.update(
+                "UPDATE coupon_issues SET used_order_id = NULL"
+        );
         orderRepository.deleteAll();
-
         couponIssueRepository.deleteAll();
         couponRepository.deleteAll();
         userRepository.deleteAll();
