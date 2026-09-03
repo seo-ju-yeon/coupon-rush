@@ -7,6 +7,9 @@ plugins {
 group = 'dev.portfolio'
 version = '0.0.1-SNAPSHOT'
 description = 'coupon-rush'
+// Swagger의 간접 의존성인 commons-lang3가 취약한 3.17.0으로 선택되는 문제를 방지함
+// CVE-2025-48924가 수정된 3.20.0으로 관리 버전을 재정의함
+ext['commons-lang3.version'] = '3.20.0'
 
 java {
     toolchain {
@@ -45,6 +48,10 @@ dependencies {
     testImplementation 'org.springframework.boot:spring-boot-testcontainers'
     testImplementation 'org.testcontainers:junit-jupiter'
     testImplementation 'org.testcontainers:postgresql'
+
+    // Spring MVC API의 OpenAPI 명세를 자동 생성하고 Swagger UI를 제공
+    // Source: https://mvnrepository.com/artifact/org.springdoc/springdoc-openapi-starter-webmvc-ui
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.17'
 }
 
 tasks.named('test') {
