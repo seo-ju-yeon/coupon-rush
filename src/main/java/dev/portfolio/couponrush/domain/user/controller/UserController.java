@@ -4,6 +4,9 @@ import dev.portfolio.couponrush.domain.user.dto.UserCreateRequest;
 import dev.portfolio.couponrush.domain.user.dto.UserResponse;
 import dev.portfolio.couponrush.domain.user.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -27,6 +30,11 @@ public class UserController {
             summary = "사용자 생성",
             description = "이메일과 닉네임을 입력받아 새로운 사용자를 생성함"
     )
+    @ApiResponses({
+            @ApiResponse(responseCode = "201", description = "사용자 생성 성공"),
+            @ApiResponse(responseCode = "400", description = "요청값 검증 실패"),
+            @ApiResponse(responseCode = "409", description = "이메일 중복")
+    })
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public UserResponse createUser(@Valid @RequestBody UserCreateRequest request) {
@@ -40,8 +48,14 @@ public class UserController {
             summary = "사용자 단건 조회",
             description = "사용자 ID로 사용자 정보를 조회함"
     )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "사용자 조회 성공"),
+            @ApiResponse(responseCode = "404", description = "사용자를 찾을 수 없음")
+    })
     @GetMapping("/{userId}")
-    public UserResponse getUser(@PathVariable Long userId) {
+    public UserResponse getUser(
+            @Parameter(description = "조회할 사용자 ID", example = "1")
+            @PathVariable Long userId) {
         log.info("사용자 단건 조회 요청: userId={}", userId);
         return userService.getUser(userId);
     }

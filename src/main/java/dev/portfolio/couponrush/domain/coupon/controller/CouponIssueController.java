@@ -4,6 +4,9 @@ import dev.portfolio.couponrush.domain.coupon.dto.CouponIssueCreateRequest;
 import dev.portfolio.couponrush.domain.coupon.dto.CouponIssueResponse;
 import dev.portfolio.couponrush.domain.coupon.service.CouponIssueService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -27,9 +30,16 @@ public class CouponIssueController {
             summary = "쿠폰 발급",
             description = "쿠폰 ID와 사용자 ID를 받아 해당 사용자에게 쿠폰을 발급함"
     )
+    @ApiResponses({
+            @ApiResponse(responseCode = "201", description = "쿠폰 발급 성공"),
+            @ApiResponse(responseCode = "400", description = "요청값 또는 쿠폰 발급 기간 검증 실패"),
+            @ApiResponse(responseCode = "404", description = "쿠폰 또는 사용자를 찾을 수 없음"),
+            @ApiResponse(responseCode = "409", description = "발급 불가, 수량 소진 또는 중복 발급")
+    })
     @PostMapping("/{couponId}/issues")
     @ResponseStatus(HttpStatus.CREATED)
     public CouponIssueResponse issueResponse(
+            @Parameter(description = "발급할 쿠폰 ID", example = "1")
             @PathVariable Long couponId,
             @Valid @RequestBody CouponIssueCreateRequest request
     ) {

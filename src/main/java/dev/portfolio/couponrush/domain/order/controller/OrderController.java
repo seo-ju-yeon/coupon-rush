@@ -4,6 +4,8 @@ import dev.portfolio.couponrush.domain.order.dto.OrderCreateRequest;
 import dev.portfolio.couponrush.domain.order.dto.OrderResponse;
 import dev.portfolio.couponrush.domain.order.service.OrderService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -27,6 +29,13 @@ public class OrderController {
             summary = "주문 생성",
             description = "사용자와 발급 쿠폰 정보를 받아 할인이 적용된 주문을 생성함"
     )
+    @ApiResponses({
+            @ApiResponse(responseCode = "201", description = "주문 생성 성공"),
+            @ApiResponse(responseCode = "400", description = "요청값 또는 주문 금액 검증 실패"),
+            @ApiResponse(responseCode = "403", description = "쿠폰 발급 사용자와 주문 사용자가 일치하지 않음"),
+            @ApiResponse(responseCode = "404", description = "사용자 또는 쿠폰 발급 내역을 찾을 수 없음"),
+            @ApiResponse(responseCode = "409", description = "사용할 수 없는 쿠폰 발급 내역")
+    })
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public OrderResponse createOrder(

@@ -4,6 +4,9 @@ import dev.portfolio.couponrush.domain.coupon.dto.CouponCreateRequest;
 import dev.portfolio.couponrush.domain.coupon.dto.CouponResponse;
 import dev.portfolio.couponrush.domain.coupon.service.CouponService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -29,6 +32,10 @@ public class CouponController {
             summary = "쿠폰 생성",
             description = "쿠폰 정보와 발급 수량 및 기간을 입력받아 새로운 쿠폰을 생성함"
     )
+    @ApiResponses({
+            @ApiResponse(responseCode = "201", description = "쿠폰 생성 성공"),
+            @ApiResponse(responseCode = "400", description = "요청값 또는 쿠폰 기간 검증 실패")
+    })
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public CouponResponse createCoupon(@Valid @RequestBody CouponCreateRequest request) {
@@ -41,8 +48,14 @@ public class CouponController {
             summary = "쿠폰 단건 조회",
             description = "쿠폰 ID로 쿠폰 정보를 조회함"
     )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "쿠폰 조회 성공"),
+            @ApiResponse(responseCode = "404", description = "쿠폰을 찾을 수 없음")
+    })
     @GetMapping("/{couponId}")
-    public CouponResponse getCoupon(@PathVariable Long couponId) {
+    public CouponResponse getCoupon(
+            @Parameter(description = "조회할 쿠폰 ID", example = "1")
+            @PathVariable Long couponId) {
         log.info("쿠폰 단건 조회 요청: couponId={}", couponId);
 
         return couponService.getCoupon(couponId);
@@ -52,6 +65,7 @@ public class CouponController {
             summary = "쿠폰 목록 조회",
             description = "등록된 전체 쿠폰 목록을 조회함"
     )
+    @ApiResponse(responseCode = "200", description = "쿠폰 목록 조회 성공")
     @GetMapping
     public List<CouponResponse> getCoupons() {
         log.info("쿠폰 목록 조회 요청");
