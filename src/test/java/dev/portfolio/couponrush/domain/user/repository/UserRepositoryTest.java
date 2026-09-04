@@ -1,6 +1,7 @@
 package dev.portfolio.couponrush.domain.user.repository;
 
 import dev.portfolio.couponrush.domain.user.entity.User;
+import dev.portfolio.couponrush.domain.user.entity.UserRole;
 import lombok.extern.log4j.Log4j2;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -35,6 +36,7 @@ class UserRepositoryTest {
         User user = new User("save@example.com", "tester");
         User saved = userRepository.save(user);
         assertThat(saved.getId()).isNotNull();
+        assertThat(saved.getRole()).isEqualTo(UserRole.USER);
     }
 
     @Test

@@ -1,6 +1,7 @@
 package dev.portfolio.couponrush.domain.user.dto;
 
 import dev.portfolio.couponrush.domain.user.entity.User;
+import dev.portfolio.couponrush.domain.user.entity.UserRole;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Getter;
 
@@ -23,6 +24,9 @@ public class UserResponse {
     @Schema(description = "사용자 닉네임", example = "couponUser")
     private final String nickname;
 
+    @Schema(description = "사용자 권한", example = "USER")
+    private final UserRole role;
+
     // 사용자의 생성 일시를 반환함
     @Schema(
             description = "사용자 생성 일시",
@@ -30,10 +34,11 @@ public class UserResponse {
     )
     private final LocalDateTime createdAt;
 
-    private UserResponse(Long id, String email, String nickname, LocalDateTime createdAt) {
+    private UserResponse(Long id, String email, String nickname, UserRole role, LocalDateTime createdAt) {
         this.id = id;
         this.email = email;
         this.nickname = nickname;
+        this.role = role;
         this.createdAt = createdAt;
     }
 
@@ -43,6 +48,7 @@ public class UserResponse {
                 user.getId(),
                 user.getEmail(),
                 user.getNickname(),
+                user.getRole(),
                 user.getCreatedAt()
         );
     }

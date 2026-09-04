@@ -23,12 +23,17 @@ public class User {
     @Column(nullable = false, length = 50)
     private String nickname;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private UserRole role;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
     public User(String email, String nickname) {
         this.email = email;
         this.nickname = nickname;
+        this.role = UserRole.USER;
         this.createdAt = LocalDateTime.now();
     }
 }
