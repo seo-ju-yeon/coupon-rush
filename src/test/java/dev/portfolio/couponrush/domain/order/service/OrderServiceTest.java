@@ -36,6 +36,9 @@ import static org.junit.jupiter.api.Assertions.*;
 @Testcontainers
 class OrderServiceTest {
 
+    // 인증이 테스트 목적이 아니므로 고정된 임시 해시값을 사용함
+    private static final String TEST_PASSWORD_HASH = "encoded-test-password";
+
     @Container
     @ServiceConnection
     static PostgreSQLContainer<?> postgreSQLContainer =
@@ -77,7 +80,7 @@ class OrderServiceTest {
     void createOrder() {
         // 주문 사용자, 쿠폰, 쿠폰 발급 내역을 준비함
         User user = userRepository.saveAndFlush(
-                new User("order-service@example.com", "tester")
+                new User("order-service@example.com", "tester", TEST_PASSWORD_HASH)
         );
 
         Coupon coupon = couponRepository.saveAndFlush(createOpenCoupon());
@@ -131,7 +134,7 @@ class OrderServiceTest {
     @Test
     void createOrderWithNotFoundCouponIssueFails() {
         User user = userRepository.saveAndFlush(
-                new User("not-found-issue@example.com", "tester")
+                new User("not-found-issue@example.com", "tester", TEST_PASSWORD_HASH)
         );
 
         OrderCreateRequest request = createRequest(
@@ -164,7 +167,7 @@ class OrderServiceTest {
         );
 
         User issueUser = userRepository.saveAndFlush(
-                new User("issue-user@example.com", "issueUser")
+                new User("issue-user@example.com", "issueUser", TEST_PASSWORD_HASH)
         );
 
         CouponIssue couponIssue = couponIssueRepository.saveAndFlush(
@@ -197,11 +200,11 @@ class OrderServiceTest {
     @Test
     void createOrderWithDifferentUserCouponIssueFails() {
         User issueUser = userRepository.saveAndFlush(
-                new User("owner@example.com", "owner")
+                new User("owner@example.com", "owner", TEST_PASSWORD_HASH)
         );
 
         User differentUser = userRepository.saveAndFlush(
-                new User("different@example.com", "different")
+                new User("different@example.com", "different", TEST_PASSWORD_HASH)
         );
 
         Coupon coupon = couponRepository.saveAndFlush(
@@ -238,7 +241,7 @@ class OrderServiceTest {
     @Test
     void createOrderWithUsedCouponIssueFails() {
         User user = userRepository.saveAndFlush(
-                new User("used-issue@example.com", "tester")
+                new User("used-issue@example.com", "tester", TEST_PASSWORD_HASH)
         );
 
         Coupon coupon = couponRepository.saveAndFlush(
@@ -278,7 +281,7 @@ class OrderServiceTest {
     @Test
     void createOrderWithInvalidAmountFails() {
         User user = userRepository.saveAndFlush(
-                new User("invalid-amount@example.com", "tester")
+                new User("invalid-amount@example.com", "tester", TEST_PASSWORD_HASH)
         );
 
         Coupon coupon = couponRepository.saveAndFlush(

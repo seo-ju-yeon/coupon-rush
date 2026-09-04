@@ -37,6 +37,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class OrderControllerTest {
     // MockMvc로 주문 API의 요청과 응답을 검증함
 
+    // 인증이 테스트 목적이 아니므로 고정된 임시 해시값을 사용함
+    private static final String TEST_PASSWORD_HASH = "encoded-test-password";
+
     @Container
     @ServiceConnection
     static PostgreSQLContainer<?> postgreSQLContainer =
@@ -78,7 +81,7 @@ class OrderControllerTest {
     void createOrder() throws Exception {
         // 주문 사용자와 쿠폰 발급 내역을 준비함
         User user = userRepository.saveAndFlush(
-                new User("order-controller@example.com", "tester")
+                new User("order-controller@example.com", "tester", TEST_PASSWORD_HASH)
         );
 
         Coupon coupon = couponRepository.saveAndFlush(
@@ -126,7 +129,7 @@ class OrderControllerTest {
     @Test
     void createOrderWithNotFoundCouponIssueFails() throws Exception {
         User user = userRepository.saveAndFlush(
-                new User("not-found-order-issue@example.com", "tester")
+                new User("not-found-order-issue@example.com", "tester", TEST_PASSWORD_HASH)
         );
 
         String requestBody = """
@@ -152,11 +155,11 @@ class OrderControllerTest {
     @Test
     void createOrderWithDifferentUserCouponIssueFails() throws Exception {
         User issueUser = userRepository.saveAndFlush(
-                new User("issue-owner@example.com", "owner")
+                new User("issue-owner@example.com", "owner", TEST_PASSWORD_HASH)
         );
 
         User differentUser = userRepository.saveAndFlush(
-                new User("different-order-user@example.com", "different")
+                new User("different-order-user@example.com", "different", TEST_PASSWORD_HASH)
         );
 
         Coupon coupon = couponRepository.saveAndFlush(
@@ -193,7 +196,7 @@ class OrderControllerTest {
     @Test
     void createOrderWithUsedCouponIssueFails() throws Exception {
         User user = userRepository.saveAndFlush(
-                new User("used-order-issue@example.com", "tester")
+                new User("used-order-issue@example.com", "tester", TEST_PASSWORD_HASH)
         );
 
         Coupon coupon = couponRepository.saveAndFlush(

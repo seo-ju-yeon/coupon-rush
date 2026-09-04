@@ -31,6 +31,9 @@ import static org.junit.jupiter.api.Assertions.fail;
 // 실제 PostgreSQL에서 주문 저장과 쿠폰 중복 사용 제약조건을 검증함
 class OrderRepositoryTest {
 
+    // 인증이 테스트 목적이 아니므로 고정된 임시 해시값을 사용함
+    private static final String TEST_PASSWORD_HASH = "encoded-test-password";
+
     // 테스트 클래스 실행 동안 사용할 PostgreSQL 컨테이너를 정의함
     @Container
     @ServiceConnection
@@ -128,7 +131,7 @@ class OrderRepositoryTest {
     }
 
     private User createUser(String email) {
-        return new User(email, "tester");
+        return new User(email, "tester", TEST_PASSWORD_HASH);
     }
 
     private Coupon createCoupon(String name) {

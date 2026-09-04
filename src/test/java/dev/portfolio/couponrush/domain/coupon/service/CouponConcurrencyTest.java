@@ -39,6 +39,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 class CouponConcurrencyTest {
     // 여러 사용자의 동시 쿠폰 발급 요청이 현재 로직에서 어떻게 처리되는지 확인함
 
+    // 인증이 테스트 목적이 아니므로 고정된 임시 해시값을 사용함
+    private static final String TEST_PASSWORD_HASH = "encoded-test-password";
+
     @Container
     @ServiceConnection
     static PostgreSQLContainer<?> postgreSQLContainer =
@@ -87,7 +90,8 @@ class CouponConcurrencyTest {
             User user = userRepository.saveAndFlush(
                     new User(
                             "concurrency-" + i + "@example.com",
-                            "user" + i
+                            "user" + i,
+                            TEST_PASSWORD_HASH
                     )
             );
 

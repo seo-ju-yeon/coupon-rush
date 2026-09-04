@@ -25,6 +25,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 // 실제 PostgreSQL에서 쿠폰 발급 내역 조회 메서드를 검증함
 class CouponIssueQueryTest {
 
+    // 인증이 테스트 목적이 아니므로 고정된 임시 해시값을 사용함
+    private static final String TEST_PASSWORD_HASH = "encoded-test-password";
+
     // 테스트 클래스 실행 동안 사용할 PostgreSQL 컨테이너를 정의함
     @Container
     @ServiceConnection
@@ -55,7 +58,7 @@ class CouponIssueQueryTest {
     void existsByCouponIdAndUserIdReturnsTrueWhenIssueExists() {
         // 쿠폰 발급 내역을 저장하기 위한 사용자와 쿠폰을 생성함
         User user = userRepository.saveAndFlush(
-                new User("query@example.com", "queryUser")
+                new User("query@example.com", "queryUser", TEST_PASSWORD_HASH)
         );
 
         Coupon coupon = couponRepository.saveAndFlush(
@@ -93,7 +96,7 @@ class CouponIssueQueryTest {
     void existsByCouponIdAndUserIdReturnsFalseWhenIssueDoesNotExist() {
         // 발급 내역을 저장하지 않은 사용자와 쿠폰을 생성함
         User user = userRepository.saveAndFlush(
-                new User("query-false@example.com", "queryUser")
+                new User("query-false@example.com", "queryUser", TEST_PASSWORD_HASH)
         );
 
         Coupon coupon = couponRepository.saveAndFlush(

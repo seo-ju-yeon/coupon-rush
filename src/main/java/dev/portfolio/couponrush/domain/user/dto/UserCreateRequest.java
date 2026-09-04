@@ -33,4 +33,18 @@ public class UserCreateRequest {
     @NotBlank(message = "닉네임은 필수입니다.")
     @Size(max = 50, message = "닉네임은 50자를 초과할 수 없습니다.")
     private String nickname;
+
+    // 사용자 비밀번호의 필수 입력과 길이를 검증함
+    @Schema(
+            description = "사용자 비밀번호",
+            example = "password123!",
+            requiredMode = Schema.RequiredMode.REQUIRED
+    )
+    @NotBlank(message = "비밀번호는 필수입니다.")
+    @Size(
+            min = 8,
+            max = 64,
+            message = "비밀번호는 8자 이상 64자 이하여야 합니다."
+    )
+    private String password;
 }

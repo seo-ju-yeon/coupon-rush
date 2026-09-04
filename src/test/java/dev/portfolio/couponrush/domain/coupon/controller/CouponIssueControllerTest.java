@@ -36,6 +36,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 // MockMvc로 쿠폰 발급 API의 요청과 응답을 검증함
 class CouponIssueControllerTest {
 
+    // 인증이 테스트 목적이 아니므로 고정된 임시 해시값을 사용함
+    private static final String TEST_PASSWORD_HASH = "encoded-test-password";
+
     @Container
     @ServiceConnection
     // 테스트 클래스 실행 동안 사용할 PostgreSQL 컨테이너를 정의함
@@ -66,7 +69,7 @@ class CouponIssueControllerTest {
     void issueCoupon() throws Exception {
         // 쿠폰을 발급받을 사용자와 쿠폰을 저장함
         User user = userRepository.saveAndFlush(
-                new User("controller-issue@example.com", "tester")
+                new User("controller-issue@example.com", "tester", TEST_PASSWORD_HASH)
         );
 
         Coupon coupon = couponRepository.saveAndFlush(
@@ -162,7 +165,7 @@ class CouponIssueControllerTest {
     @Test
     void duplicateCouponIssueFails() throws Exception {
         User user = userRepository.saveAndFlush(
-                new User("controller-duplicate@example.com", "tester")
+                new User("controller-duplicate@example.com", "tester", TEST_PASSWORD_HASH)
         );
 
         Coupon coupon = couponRepository.saveAndFlush(

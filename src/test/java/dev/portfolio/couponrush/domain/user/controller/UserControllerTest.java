@@ -29,6 +29,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 // MockMvc로 사용자 API 요청을 보내 Controller의 응답을 검증함
 class UserControllerTest {
 
+    private static final String TEST_PASSWORD_HASH = "encoded-test-password";
+
     // 테스트 클래스 실행 동안 사용할 PostgreSQL 컨테이너를 정의함
     @Container
     @ServiceConnection
@@ -54,7 +56,8 @@ class UserControllerTest {
         String requestBody = """
                 {
                   "email": "controller-create@example.com",
-                  "nickname": "tester"
+                  "nickname": "tester",
+                  "password": "password123!"
                 }
                 """;
 
@@ -75,7 +78,12 @@ class UserControllerTest {
     @Test
     void getUser() throws Exception {
         // 조회할 사용자를 데이터베이스에 먼저 저장함
-        User user = userRepository.saveAndFlush(new User("controller-get@example.com", "tester"));
+        User user = userRepository.saveAndFlush(
+                new User(
+                        "controller-get@example.com",
+                        "tester",
+                        TEST_PASSWORD_HASH
+                ));
 
         // 사용자 단건 조회 API를 호출하고 응답을 검증함
         mockMvc.perform(get("/api/users/{userId}", user.getId()))
@@ -95,14 +103,15 @@ class UserControllerTest {
         String requestBody = """
                 {
                   "email": "invalid-email",
-                  "nickname": "tester"
+                  "nickname": "tester",
+                  "password": "password123!"
                 }
                 """;
 
         // 요청값 검증 실패 시 공통 오류 응답을 반환하는지 검증함
         mockMvc.perform(post("/api/users")
                         .contentType(MediaType.APPLICATION_JSON)
-                .content(requestBody))
+                        .content(requestBody))
                 .andDo(print())
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
@@ -114,13 +123,19 @@ class UserControllerTest {
     @Test
     void createUserWithDuplicateEmailFails() throws Exception {
         // 중복 이메일을 가진 기존 사용자를 먼저 저장함
-        userRepository.saveAndFlush(new User("controller-duplicate@example.com", "tester1"));
+        userRepository.saveAndFlush(
+                new User(
+                        "controller-duplicate@example.com",
+                        "tester1",
+                        TEST_PASSWORD_HASH
+                ));
 
         // 동일한 이메일로 다시 생성 요청할 JSON을 준비함
         String requestBody = """
                 {
                   "email": "controller-duplicate@example.com",
-                  "nickname": "tester2"
+                  "nickname": "tester2",
+                  "password": "password123!"
                 }
                 """;
 
@@ -149,5 +164,29 @@ class UserControllerTest {
                 .andExpect(jsonPath("$.message").value("사용자를 찾을 수 없습니다."));
 
         log.info("사용자 단건 조회 API 없는 사용자 실패 테스트 성공: userId={}", notFoundUserId);
+    }
+
+    @Test
+    void createUserWithShortPasswordFails() throws Exception {
+        // 최소 길이를 충족하지 않는 비밀번호를 준비함
+        String requestBody = """
+            {
+              "email": "short-password@example.com",
+              "nickname": "tester",
+              "password": "short"
+            }
+            """;
+
+        // 비밀번호 길이 검증 실패 시 공통 오류 응답을 반환하는지 검증함
+        mockMvc.perform(post("/api/users")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andDo(print())
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.message")
+                        .value("비밀번호는 8자 이상 64자 이하여야 합니다."));
+
+        log.info("사용자 생성 API 비밀번호 검증 실패 테스트 성공");
     }
 }

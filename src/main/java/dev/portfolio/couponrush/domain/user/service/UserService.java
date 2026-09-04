@@ -8,6 +8,7 @@ import dev.portfolio.couponrush.domain.user.entity.User;
 import dev.portfolio.couponrush.domain.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class UserService {
 
     private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
 
     // 사용자 생성
     @Transactional
@@ -27,7 +29,15 @@ public class UserService {
             throw new BusinessException(ErrorCode.DUPLICATE_EMAIL);
         }
 
-        User user = new User(request.getEmail(), request.getNickname());
+        // 평문 비밀번호를 BCrypt 해시로 변환함
+        String passwordHash = passwordEncoder.encode(request.getPassword());
+
+        User user = new User(
+                request.getEmail(),
+                request.getNickname(),
+                passwordHash
+        );
+
         User savedUser = userRepository.save(user);
 
         return UserResponse.from(savedUser);

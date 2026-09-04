@@ -33,6 +33,9 @@ import static org.junit.jupiter.api.Assertions.*;
 class CouponIssueServiceTest {
     // 실제 Spring Context와 PostgreSQL을 사용하여 쿠폰 발급 Service를 검증함
 
+    // 인증이 테스트 목적이 아니므로 고정된 임시 해시값을 사용함
+    private static final String TEST_PASSWORD_HASH = "encoded-test-password";
+
     @Container
     @ServiceConnection
     // 테스트 클래스 실행 동안 사용할 PostgreSQL 컨테이너를 정의
@@ -62,7 +65,7 @@ class CouponIssueServiceTest {
     void issueCoupon() {
         // 정상 발급에 필요한 사용자와 쿠폰을 저장함
         User user = userRepository.saveAndFlush(
-                new User("issue-service@example.com", "tester")
+                new User("issue-service@example.com", "tester", TEST_PASSWORD_HASH)
         );
 
         Coupon coupon = couponRepository.saveAndFlush(
@@ -100,7 +103,7 @@ class CouponIssueServiceTest {
         Long notFoundCouponId = 999L;
 
         User user = userRepository.saveAndFlush(
-                new User("not-found-coupon@example.com", "tester")
+                new User("not-found-coupon@example.com", "tester", TEST_PASSWORD_HASH)
         );
 
         CouponIssueCreateRequest request =
@@ -158,7 +161,9 @@ class CouponIssueServiceTest {
     @Test
     void issueCouponWithNotOpenCouponFails() {
         // 발급 상태가 READY인 쿠폰을 저장함
-        User user = userRepository.saveAndFlush(new User("not-open@example.com", "tester"));
+        User user = userRepository.saveAndFlush(
+                new User("not-open@example.com", "tester", TEST_PASSWORD_HASH)
+        );
 
         Coupon coupon = couponRepository.saveAndFlush(
                 new Coupon(
@@ -196,7 +201,7 @@ class CouponIssueServiceTest {
     void issueCouponWithInvalidPeriodFails() {
         // 아직 발급 시작 전인 쿠폰을 저장함
         User user = userRepository.saveAndFlush(
-                new User("invalid-period@example.com", "tester")
+                new User("invalid-period@example.com", "tester", TEST_PASSWORD_HASH)
         );
 
         Coupon coupon = couponRepository.saveAndFlush(
@@ -235,7 +240,7 @@ class CouponIssueServiceTest {
     void issueCouponWithSoldOutCouponFails() {
         // 수량이 1개인 쿠폰과 첫 번째 사용자를 저장함
         User firstUser = userRepository.saveAndFlush(
-                new User("sold-out-first@example.com", "tester1")
+                new User("sold-out-first@example.com", "tester1", TEST_PASSWORD_HASH)
         );
 
         Coupon coupon = couponRepository.saveAndFlush(
@@ -253,7 +258,7 @@ class CouponIssueServiceTest {
 
         // 두 번째 사용자를 저장함
         User secondUser = userRepository.saveAndFlush(
-                new User("sold-out-second@example.com", "tester2")
+                new User("sold-out-second@example.com", "tester2", TEST_PASSWORD_HASH)
         );
 
         // 수량이 모두 소진된 쿠폰의 발급을 시도함
@@ -280,7 +285,7 @@ class CouponIssueServiceTest {
     void duplicateCouponIssueFails() {
         // 사용자와 쿠폰을 저장함
         User user = userRepository.saveAndFlush(
-                new User("duplicate-issue@example.com", "tester")
+                new User("duplicate-issue@example.com", "tester", TEST_PASSWORD_HASH)
         );
 
         Coupon coupon = couponRepository.saveAndFlush(
