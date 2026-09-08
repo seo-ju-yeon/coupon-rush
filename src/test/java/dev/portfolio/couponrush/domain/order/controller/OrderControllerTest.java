@@ -19,6 +19,7 @@ import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -37,7 +38,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Testcontainers
 @AutoConfigureMockMvc
 class OrderControllerTest {
-    // MockMvc로 주문 API의 요청과 응답을 검증함
 
     // 인증이 테스트 목적이 아니므로 고정된 임시 해시값을 사용함
     private static final String TEST_PASSWORD_HASH = "encoded-test-password";
@@ -48,20 +48,19 @@ class OrderControllerTest {
             new PostgreSQLContainer<>("postgres:16");
 
     @Autowired
-    // HTTP 요청을 보내는 테스트 도구를 주입받음
     MockMvc mockMvc;
 
     @Autowired
-    OrderRepository orderRepository;  // 주문 데이터 정리
+    OrderRepository orderRepository;
 
     @Autowired
-    CouponIssueRepository couponIssueRepository;  // 쿠폰 발급 내역 저장
+    CouponIssueRepository couponIssueRepository;
 
     @Autowired
-    CouponRepository couponRepository;  // 쿠폰 저장
+    CouponRepository couponRepository;
 
     @Autowired
-    UserRepository userRepository;  // 사용자 저장
+    UserRepository userRepository;
 
     @Autowired
     JdbcTemplate jdbcTemplate; // 테스트 준비 과정에서 SQL을 직접 실행하기 위해 사용
@@ -83,7 +82,11 @@ class OrderControllerTest {
     void createOrder() throws Exception {
         // 주문 사용자와 쿠폰 발급 내역을 준비함
         User user = userRepository.saveAndFlush(
-                new User("order-controller@example.com", "tester", TEST_PASSWORD_HASH)
+                new User(
+                        "order-controller@example.com",
+                        "tester",
+                        TEST_PASSWORD_HASH
+                )
         );
 
         Coupon coupon = couponRepository.saveAndFlush(
@@ -96,20 +99,15 @@ class OrderControllerTest {
 
         String requestBody = """
                 {
-                  "userId": %d,
                   "couponIssueId": %d,
                   "originalAmount": 10000
                 }
-                """.formatted(
-                user.getId(),
-                couponIssue.getId()
-        );
+                """.formatted(couponIssue.getId());
 
         // 주문 생성 API를 호출하고 응답을 검증함
         mockMvc.perform(post("/api/orders")
-                        .with(jwt().authorities(
-                                new SimpleGrantedAuthority("ROLE_USER")
-                        ))
+                        // 쿠폰을 발급받은 사용자가 로그인한 상황을 재현함
+                        .with(loginAs(user.getId()))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody))
                 .andDo(print())
@@ -134,22 +132,23 @@ class OrderControllerTest {
     @Test
     void createOrderWithNotFoundCouponIssueFails() throws Exception {
         User user = userRepository.saveAndFlush(
-                new User("not-found-order-issue@example.com", "tester", TEST_PASSWORD_HASH)
+                new User(
+                        "not-found-order-issue@example.com",
+                        "tester",
+                        TEST_PASSWORD_HASH
+                )
         );
 
         String requestBody = """
                 {
-                  "userId": %d,
                   "couponIssueId": 999,
                   "originalAmount": 10000
                 }
-                """.formatted(user.getId());
+                """;
 
         // 존재하지 않는 쿠폰 발급 내역으로 주문 생성 시 404를 반환하는지 검증함
         mockMvc.perform(post("/api/orders")
-                        .with(jwt().authorities(
-                                new SimpleGrantedAuthority("ROLE_USER")
-                        ))
+                        .with(loginAs(user.getId()))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody))
                 .andDo(print())
@@ -163,11 +162,19 @@ class OrderControllerTest {
     @Test
     void createOrderWithDifferentUserCouponIssueFails() throws Exception {
         User issueUser = userRepository.saveAndFlush(
-                new User("issue-owner@example.com", "owner", TEST_PASSWORD_HASH)
+                new User(
+                        "issue-owner@example.com",
+                        "owner",
+                        TEST_PASSWORD_HASH
+                )
         );
 
         User differentUser = userRepository.saveAndFlush(
-                new User("different-order-user@example.com", "different", TEST_PASSWORD_HASH)
+                new User(
+                        "different-order-user@example.com",
+                        "different",
+                        TEST_PASSWORD_HASH
+                )
         );
 
         Coupon coupon = couponRepository.saveAndFlush(
@@ -180,20 +187,15 @@ class OrderControllerTest {
 
         String requestBody = """
                 {
-                  "userId": %d,
                   "couponIssueId": %d,
                   "originalAmount": 10000
                 }
-                """.formatted(
-                differentUser.getId(),
-                couponIssue.getId()
-        );
+                """.formatted(couponIssue.getId());
 
         // 다른 사용자의 쿠폰으로 주문 생성 시 403을 반환하는지 검증함
         mockMvc.perform(post("/api/orders")
-                        .with(jwt().authorities(
-                                new SimpleGrantedAuthority("ROLE_USER")
-                        ))
+                        // 쿠폰 소유자가 아닌 사용자가 로그인한 상황을 재현함
+                        .with(loginAs(differentUser.getId()))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody))
                 .andDo(print())
@@ -207,7 +209,11 @@ class OrderControllerTest {
     @Test
     void createOrderWithUsedCouponIssueFails() throws Exception {
         User user = userRepository.saveAndFlush(
-                new User("used-order-issue@example.com", "tester", TEST_PASSWORD_HASH)
+                new User(
+                        "used-order-issue@example.com",
+                        "tester",
+                        TEST_PASSWORD_HASH
+                )
         );
 
         Coupon coupon = couponRepository.saveAndFlush(
@@ -222,20 +228,14 @@ class OrderControllerTest {
 
         String requestBody = """
                 {
-                  "userId": %d,
                   "couponIssueId": %d,
                   "originalAmount": 10000
                 }
-                """.formatted(
-                user.getId(),
-                couponIssue.getId()
-        );
+                """.formatted(couponIssue.getId());
 
         // 이미 사용된 쿠폰으로 주문 생성 시 409를 반환하는지 검증함
         mockMvc.perform(post("/api/orders")
-                        .with(jwt().authorities(
-                                new SimpleGrantedAuthority("ROLE_USER")
-                        ))
+                        .with(loginAs(user.getId()))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody))
                 .andDo(print())
@@ -250,7 +250,6 @@ class OrderControllerTest {
     void createOrderWithInvalidRequestFails() throws Exception {
         String requestBody = """
                 {
-                  "userId": null,
                   "couponIssueId": null,
                   "originalAmount": -1
                 }
@@ -258,9 +257,8 @@ class OrderControllerTest {
 
         // 잘못된 요청값으로 주문 생성 시 400을 반환하는지 검증함
         mockMvc.perform(post("/api/orders")
-                        .with(jwt().authorities(
-                                new SimpleGrantedAuthority("ROLE_USER")
-                        ))
+                        // 요청값 검증이 목적이므로 임의의 로그인 사용자 ID를 사용함
+                        .with(loginAs(1L))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody))
                 .andDo(print())
@@ -281,5 +279,16 @@ class OrderControllerTest {
                 LocalDateTime.now().plusDays(1),
                 CouponStatus.OPEN
         );
+    }
+
+    // JWT의 subject에 로그인 사용자 ID를 설정함 (JWT생성 중복 줄이기 위함)
+    private RequestPostProcessor loginAs(Long userId) {
+        return jwt()
+                .jwt(jwtBuilder ->
+                        jwtBuilder.subject(userId.toString())
+                )
+                .authorities(
+                        new SimpleGrantedAuthority("ROLE_USER")
+                );
     }
 }

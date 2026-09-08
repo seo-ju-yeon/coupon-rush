@@ -12,14 +12,6 @@ import lombok.NoArgsConstructor;
 public class OrderCreateRequest {
     // 주문 생성 API의 요청 데이터를 담는 DTO
 
-    // 주문을 생성할 사용자의 ID를 검증함
-    @Schema(
-            description = "주문을 생성할 사용자 식별자",
-            example = "1",
-            requiredMode = Schema.RequiredMode.REQUIRED
-    )
-    @NotNull(message = "사용자 ID는 필수입니다.")
-    private Long userId;
 
     // 주문에 사용할 쿠폰 발급 내역의 ID를 검증함
     @Schema(

@@ -41,6 +41,7 @@ class OrderServiceTest {
 
     @Container
     @ServiceConnection
+    // 테스트용 PostgreSQL 컨테이너의 접속 정보를 Spring DataSource에 자동으로 연결함
     static PostgreSQLContainer<?> postgreSQLContainer =
             new PostgreSQLContainer<>("postgres:16");
 
@@ -48,29 +49,29 @@ class OrderServiceTest {
     OrderService orderService;
 
     @Autowired
-    OrderRepository orderRepository;  // 주문 저장
+    OrderRepository orderRepository;
 
     @Autowired
-    CouponIssueRepository couponIssueRepository;  // 쿠폰 발급 내역 저장
+    CouponIssueRepository couponIssueRepository;
 
     @Autowired
-    CouponRepository couponRepository;  // 쿠폰 저장
+    CouponRepository couponRepository;
 
     @Autowired
-    UserRepository userRepository;  // 사용자 저장
+    UserRepository userRepository;
 
     @Autowired
     JdbcTemplate jdbcTemplate; // 테스트 준비 과정에서 SQL을 직접 실행하기 위해 사용
 
     @BeforeEach
     void setUp() {
+        // 각 테스트 실행 전에 이전 테스트 데이터를 제거하여 테스트끼리 영향을 주지 않도록 함
         // 기존에는 외래 키 제약조건을 고려해 주문부터 삭제했으나 순환 참조로 실패함
         // used_order_id 참조를 먼저 해제한 후 주문부터 역순으로 테스트 데이터를 삭제함
         jdbcTemplate.update(
                 "UPDATE coupon_issues SET used_order_id = NULL"
         );
         orderRepository.deleteAll();
-        // 쿠폰 발급 내역에 연결된 데이터를 삭제함
         couponIssueRepository.deleteAll();
         couponRepository.deleteAll();
         userRepository.deleteAll();
@@ -80,21 +81,32 @@ class OrderServiceTest {
     void createOrder() {
         // 주문 사용자, 쿠폰, 쿠폰 발급 내역을 준비함
         User user = userRepository.saveAndFlush(
-                new User("order-service@example.com", "tester", TEST_PASSWORD_HASH)
+                new User(
+                        "order-service@example.com",
+                        "tester",
+                        TEST_PASSWORD_HASH
+                )
         );
 
-        Coupon coupon = couponRepository.saveAndFlush(createOpenCoupon());
+        Coupon coupon = couponRepository.saveAndFlush(
+                createOpenCoupon()
+        );
 
-        CouponIssue couponIssue = couponIssueRepository.saveAndFlush(new CouponIssue(coupon, user));
+        CouponIssue couponIssue =
+                couponIssueRepository.saveAndFlush(
+                        new CouponIssue(coupon, user)
+                );
 
         OrderCreateRequest request = createRequest(
-                user.getId(),
                 couponIssue.getId(),
                 10_000
         );
 
-        // 주문 생성 Service를 호출함
-        OrderResponse response = orderService.createOrder(request);
+        // Controller가 JWT의 subject에서 꺼낸 사용자 ID를 전달하는 상황을 재현함
+        OrderResponse response = orderService.createOrder(
+                user.getId(),
+                request
+        );
 
         CouponIssue usedCouponIssue = couponIssueRepository
                 .findById(couponIssue.getId())
@@ -134,18 +146,21 @@ class OrderServiceTest {
     @Test
     void createOrderWithNotFoundCouponIssueFails() {
         User user = userRepository.saveAndFlush(
-                new User("not-found-issue@example.com", "tester", TEST_PASSWORD_HASH)
+                new User(
+                        "not-found-issue@example.com",
+                        "tester",
+                        TEST_PASSWORD_HASH
+                )
         );
 
         OrderCreateRequest request = createRequest(
-                user.getId(),
                 999L,
                 10_000
         );
 
         // 존재하지 않는 쿠폰 발급 내역으로 주문 생성 시 예외가 발생하는지 확인함
         try {
-            orderService.createOrder(request);
+            orderService.createOrder(user.getId(), request);
 
             fail("예외가 발생해야 하는데 발생하지 않았습니다.");
         } catch (BusinessException e) {
@@ -174,21 +189,22 @@ class OrderServiceTest {
                 new CouponIssue(coupon, issueUser)
         );
 
+        Long notFoundUserId = 999L;
+
         OrderCreateRequest request = createRequest(
-                999L,
                 couponIssue.getId(),
                 10_000
         );
 
         // 존재하지 않는 사용자로 주문 생성 시 예외가 발생하는지 확인함
         try {
-            orderService.createOrder(request);
+            orderService.createOrder(notFoundUserId, request);
 
             fail("예외가 발생해야 하는데 발생하지 않았습니다.");
         } catch (BusinessException e) {
             log.info(
                     "없는 사용자 주문 실패 확인: userId={}, message={}",
-                    request.getUserId(),
+                    notFoundUserId,
                     e.getMessage()
             );
 
@@ -216,14 +232,14 @@ class OrderServiceTest {
         );
 
         OrderCreateRequest request = createRequest(
-                differentUser.getId(),
                 couponIssue.getId(),
                 10_000
         );
 
-        // 다른 사용자의 쿠폰 발급 내역으로 주문 시 예외가 발생하는지 확인함
+        // 다른 사용자의 쿠폰 발급 내역으로 주문 시 예외가 발생하는지 확인
         try {
-            orderService.createOrder(request);
+            // 로그인 사용자와 쿠폰 소유자가 다른 상황을 재현함
+            orderService.createOrder(differentUser.getId(), request);
 
             fail("예외가 발생해야 하는데 발생하지 않았습니다.");
         } catch (BusinessException e) {
@@ -256,14 +272,13 @@ class OrderServiceTest {
         couponIssueRepository.saveAndFlush(couponIssue);
 
         OrderCreateRequest request = createRequest(
-                user.getId(),
                 couponIssue.getId(),
                 10_000
         );
 
         // 이미 사용된 쿠폰 발급 내역으로 주문 시 예외가 발생하는지 확인함
         try {
-            orderService.createOrder(request);
+            orderService.createOrder(user.getId(), request);
 
             fail("예외가 발생해야 하는데 발생하지 않았습니다.");
         } catch (BusinessException e) {
@@ -293,14 +308,13 @@ class OrderServiceTest {
         );
 
         OrderCreateRequest request = createRequest(
-                user.getId(),
                 couponIssue.getId(),
                 500
         );
 
         // 주문 금액보다 할인 금액이 큰 경우 예외가 발생하는지 확인함
         try {
-            orderService.createOrder(request);
+            orderService.createOrder(user.getId(), request);
 
             fail("예외가 발생해야 하는데 발생하지 않았습니다.");
         } catch (BusinessException e) {
@@ -316,14 +330,13 @@ class OrderServiceTest {
     }
 
     private OrderCreateRequest createRequest(
-            Long userId,
             Long couponIssueId,
             Integer originalAmount
     ) {
         // setter 없이 테스트 요청 DTO의 private 필드에 값을 주입함
         OrderCreateRequest request = new OrderCreateRequest();
 
-        ReflectionTestUtils.setField(request, "userId", userId);
+        // 필드 이름을 문자열로 지정하므로 실제 DTO의 필드명과 정확히 일치해야 함
         ReflectionTestUtils.setField(
                 request,
                 "couponIssueId",

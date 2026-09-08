@@ -11,6 +11,8 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
 @Tag(
@@ -27,7 +29,7 @@ public class OrderController {
 
     @Operation(
             summary = "주문 생성",
-            description = "사용자와 발급 쿠폰 정보를 받아 할인이 적용된 주문을 생성함"
+            description = "로그인한 사용자가 발급받은 쿠폰으로 주문을 생성함"
     )
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "주문 생성 성공"),
@@ -39,15 +41,22 @@ public class OrderController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public OrderResponse createOrder(
+            @AuthenticationPrincipal Jwt jwt,
             @Valid @RequestBody OrderCreateRequest request
     ) {
+        // JWT의 subject에서 로그인한 사용자 ID를 가져옴
+        Long userId = Long.valueOf(jwt.getSubject());
+
         log.info(
                 "주문 생성 API 요청: userId={}, couponIssueId={}, originalAmount={}",
-                request.getUserId(),
+                userId,
                 request.getCouponIssueId(),
                 request.getOriginalAmount()
         );
 
-        return orderService.createOrder(request);
+        return orderService.createOrder(
+                userId,
+                request
+        );
     }
 }

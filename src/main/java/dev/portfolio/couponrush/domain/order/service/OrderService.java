@@ -39,13 +39,17 @@ public class OrderService {
     private final UserRepository userRepository;
 
     @Transactional
-    public OrderResponse createOrder(OrderCreateRequest request) {
+    public OrderResponse createOrder(
+            Long userId,
+            OrderCreateRequest request
+    ) {
         log.info("주문 생성 요청: userId={}, couponIssueId={}, originalAmount={}",
-                request.getUserId(),
+                userId,
                 request.getCouponIssueId(),
                 request.getOriginalAmount());
 
-        User user = userRepository.findById(request.getUserId())
+        // JWT에서 전달받은 사용자 ID로 주문 사용자를 조회함
+        User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(
                         ErrorCode.USER_NOT_FOUND
                 ));
@@ -56,7 +60,9 @@ public class OrderService {
                                 ErrorCode.COUPON_ISSUE_NOT_FOUND
                         ));
 
+        // 로그인 사용자에게 발급된 쿠폰인지 확인함
         validateCouponIssueUser(couponIssue, user);
+        // 아직 사용하지 않은 쿠폰인지 확인함
         validateCouponIssueUsable(couponIssue);
 
         Integer discountAmount = couponIssue.getCoupon().getDiscountAmount();
