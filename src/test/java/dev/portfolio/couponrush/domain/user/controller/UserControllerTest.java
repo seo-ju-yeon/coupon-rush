@@ -14,6 +14,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 
 import static org.hamcrest.Matchers.notNullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -86,7 +87,8 @@ class UserControllerTest {
                 ));
 
         // 사용자 단건 조회 API를 호출하고 응답을 검증함
-        mockMvc.perform(get("/api/users/{userId}", user.getId()))
+        mockMvc.perform(get("/api/users/{userId}", user.getId())
+                        .with(jwt()))
                 .andDo(print())
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(user.getId()))
@@ -157,7 +159,8 @@ class UserControllerTest {
         Long notFoundUserId = 999L;
 
         // 없는 사용자 조회 시 공통 오류 응답을 반환하는지 검증함
-        mockMvc.perform(get("/api/users/{userId}", notFoundUserId))
+        mockMvc.perform(get("/api/users/{userId}", notFoundUserId)
+                        .with(jwt()))
                 .andDo(print())
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("USER_NOT_FOUND"))

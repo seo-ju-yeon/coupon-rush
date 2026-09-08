@@ -25,6 +25,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import java.time.LocalDateTime;
 
 import static org.hamcrest.Matchers.notNullValue;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -105,6 +106,7 @@ class OrderControllerTest {
 
         // 주문 생성 API를 호출하고 응답을 검증함
         mockMvc.perform(post("/api/orders")
+                        .with(jwt())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody))
                 .andDo(print())
@@ -142,6 +144,7 @@ class OrderControllerTest {
 
         // 존재하지 않는 쿠폰 발급 내역으로 주문 생성 시 404를 반환하는지 검증함
         mockMvc.perform(post("/api/orders")
+                        .with(jwt())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody))
                 .andDo(print())
@@ -183,6 +186,7 @@ class OrderControllerTest {
 
         // 다른 사용자의 쿠폰으로 주문 생성 시 403을 반환하는지 검증함
         mockMvc.perform(post("/api/orders")
+                        .with(jwt())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody))
                 .andDo(print())
@@ -222,6 +226,7 @@ class OrderControllerTest {
 
         // 이미 사용된 쿠폰으로 주문 생성 시 409를 반환하는지 검증함
         mockMvc.perform(post("/api/orders")
+                        .with(jwt())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody))
                 .andDo(print())
@@ -244,6 +249,7 @@ class OrderControllerTest {
 
         // 잘못된 요청값으로 주문 생성 시 400을 반환하는지 검증함
         mockMvc.perform(post("/api/orders")
+                        .with(jwt())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody))
                 .andDo(print())

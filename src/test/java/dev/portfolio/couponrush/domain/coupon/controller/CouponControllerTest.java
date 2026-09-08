@@ -16,6 +16,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.notNullValue;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
@@ -63,6 +64,7 @@ class CouponControllerTest {
 
         // POST 요청을 보내고 생성 응답을 검증함
         mockMvc.perform(post("/api/coupons")
+                        .with(jwt())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody))
                 .andDo(print())
@@ -104,11 +106,13 @@ class CouponControllerTest {
 
         // 쿠폰 두 개를 생성함
         mockMvc.perform(post("/api/coupons")
+                        .with(jwt())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(firstRequest))
                 .andExpect(status().isCreated());
 
         mockMvc.perform(post("/api/coupons")
+                        .with(jwt())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(secondRequest))
                 .andExpect(status().isCreated());
@@ -137,6 +141,7 @@ class CouponControllerTest {
 
         // 요청값 검증 실패 시 400 응답과 공통 오류 코드를 반환하는지 검증함
         mockMvc.perform(post("/api/coupons")
+                        .with(jwt())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody))
                 .andDo(print())

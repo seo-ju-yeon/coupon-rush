@@ -24,6 +24,7 @@ import java.time.LocalDateTime;
 
 import static org.hamcrest.Matchers.notNullValue;
 import static org.junit.jupiter.api.Assertions.*;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -87,6 +88,7 @@ class CouponIssueControllerTest {
                         "/api/coupons/{couponId}/issues",
                         coupon.getId()
                 )
+                        .with(jwt())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody))
                 .andDo(print())
@@ -120,6 +122,7 @@ class CouponIssueControllerTest {
                         "/api/coupons/{couponId}/issues",
                         notFoundCouponId
                 )
+                        .with(jwt())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody))
                 .andDo(print())
@@ -150,6 +153,7 @@ class CouponIssueControllerTest {
                         "/api/coupons/{couponId}/issues",
                         coupon.getId()
                 )
+                        .with(jwt())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody))
                 .andDo(print())
@@ -183,6 +187,7 @@ class CouponIssueControllerTest {
                         "/api/coupons/{couponId}/issues",
                         coupon.getId()
                 )
+                        .with(jwt())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody))
                 .andExpect(status().isCreated());
@@ -192,6 +197,7 @@ class CouponIssueControllerTest {
                         "/api/coupons/{couponId}/issues",
                         coupon.getId()
                 )
+                        .with(jwt())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody))
                 .andDo(print())
@@ -220,6 +226,7 @@ class CouponIssueControllerTest {
                         "/api/coupons/{couponId}/issues",
                         1L
                 )
+                        .with(jwt())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody))
                 .andDo(print())
