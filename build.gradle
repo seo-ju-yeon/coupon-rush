@@ -57,6 +57,9 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-security'
     implementation 'org.springframework.boot:spring-boot-starter-oauth2-resource-server'
     testImplementation 'org.springframework.security:spring-security-test'
+
+    // Redis distributed lock
+    implementation 'org.redisson:redisson:4.7.0'
 }
 
 tasks.named('test') {

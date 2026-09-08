@@ -11,5 +11,18 @@ services:
     volumes:
       - coupon-rush-postgres-data:/var/lib/postgresql/data
 
+  # 분산 락을 관리할 Redis 서버
+  redis:
+    image: redis:7.4.11-alpine
+    container_name: coupon-rush-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      # Redis가 명령을 받을 수 있는 상태인지 확인함
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
 volumes:
   coupon-rush-postgres-data:
