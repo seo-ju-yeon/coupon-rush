@@ -88,4 +88,31 @@ class UserRepositoryTest {
         assertThat(saved.getCreatedAt()).isNotNull();
     }
 
+    @Test
+    void findUserByEmail() {
+        // 이메일로 조회할 사용자를 먼저 저장함
+        User user = new User(
+                "find-by-email@example.com",
+                "tester",
+                TEST_PASSWORD_HASH
+        );
+
+        userRepository.saveAndFlush(user);
+
+        // 저장한 이메일로 사용자를 조회함
+        User foundUser = userRepository
+                .findByEmail("find-by-email@example.com")
+                .orElseThrow();
+
+        // 조회된 사용자가 저장한 사용자와 같은지 검증함
+        assertThat(foundUser.getId()).isEqualTo(user.getId());
+        assertThat(foundUser.getEmail())
+                .isEqualTo("find-by-email@example.com");
+    }
+
+    @Test
+    void findUserByEmailReturnsEmpty() {
+        // 존재하지 않는 이메일을 조회하면 빈 Optional을 반환하는지 검증함
+        assertThat(userRepository.findByEmail("not-found@example.com")).isEmpty();
+    }
 }
