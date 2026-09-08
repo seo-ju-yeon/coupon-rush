@@ -85,6 +85,24 @@ public class SecurityConfig {
                                 "/api/coupons/**"
                         ).permitAll()
 
+                        // 쿠폰 생성은 관리자만 접근 가능함
+                        .requestMatchers(
+                                HttpMethod.POST,
+                                "/api/coupons"
+                        ).hasRole("ADMIN")
+
+                        // 쿠폰 발급은 일반 사용자와 관리자 모두 접근 가능함
+                        .requestMatchers(
+                                HttpMethod.POST,
+                                "/api/coupons/*/issues"
+                        ).hasAnyRole("USER", "ADMIN")
+
+                        // 주문 생성은 일반 사용자와 관리자 모두 접근 가능함
+                        .requestMatchers(
+                                HttpMethod.POST,
+                                "/api/orders"
+                        ).hasAnyRole("USER", "ADMIN")
+
                         // Spring Boot 오류 처리 경로를 허용함
                         .requestMatchers("/error").permitAll()
 

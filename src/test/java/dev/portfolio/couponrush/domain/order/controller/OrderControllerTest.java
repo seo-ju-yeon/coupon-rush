@@ -17,6 +17,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.web.servlet.MockMvc;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
@@ -106,7 +107,9 @@ class OrderControllerTest {
 
         // 주문 생성 API를 호출하고 응답을 검증함
         mockMvc.perform(post("/api/orders")
-                        .with(jwt())
+                        .with(jwt().authorities(
+                                new SimpleGrantedAuthority("ROLE_USER")
+                        ))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody))
                 .andDo(print())
@@ -144,7 +147,9 @@ class OrderControllerTest {
 
         // 존재하지 않는 쿠폰 발급 내역으로 주문 생성 시 404를 반환하는지 검증함
         mockMvc.perform(post("/api/orders")
-                        .with(jwt())
+                        .with(jwt().authorities(
+                                new SimpleGrantedAuthority("ROLE_USER")
+                        ))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody))
                 .andDo(print())
@@ -186,7 +191,9 @@ class OrderControllerTest {
 
         // 다른 사용자의 쿠폰으로 주문 생성 시 403을 반환하는지 검증함
         mockMvc.perform(post("/api/orders")
-                        .with(jwt())
+                        .with(jwt().authorities(
+                                new SimpleGrantedAuthority("ROLE_USER")
+                        ))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody))
                 .andDo(print())
@@ -226,7 +233,9 @@ class OrderControllerTest {
 
         // 이미 사용된 쿠폰으로 주문 생성 시 409를 반환하는지 검증함
         mockMvc.perform(post("/api/orders")
-                        .with(jwt())
+                        .with(jwt().authorities(
+                                new SimpleGrantedAuthority("ROLE_USER")
+                        ))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody))
                 .andDo(print())
@@ -249,7 +258,9 @@ class OrderControllerTest {
 
         // 잘못된 요청값으로 주문 생성 시 400을 반환하는지 검증함
         mockMvc.perform(post("/api/orders")
-                        .with(jwt())
+                        .with(jwt().authorities(
+                                new SimpleGrantedAuthority("ROLE_USER")
+                        ))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody))
                 .andDo(print())

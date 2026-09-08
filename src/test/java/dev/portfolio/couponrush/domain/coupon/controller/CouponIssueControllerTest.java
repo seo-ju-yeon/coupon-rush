@@ -15,6 +15,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.http.MediaType;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.web.servlet.MockMvc;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
@@ -88,7 +89,9 @@ class CouponIssueControllerTest {
                         "/api/coupons/{couponId}/issues",
                         coupon.getId()
                 )
-                        .with(jwt())
+                        .with(jwt().authorities(
+                                new SimpleGrantedAuthority("ROLE_USER")
+                        ))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody))
                 .andDo(print())
@@ -118,11 +121,13 @@ class CouponIssueControllerTest {
                 """;
 
         // 존재하지 않는 쿠폰 발급 요청이 404로 처리되는지 검증함
-        mockMvc.perform(post(
+                mockMvc.perform(post(
                         "/api/coupons/{couponId}/issues",
                         notFoundCouponId
                 )
-                        .with(jwt())
+                        .with(jwt().authorities(
+                                new SimpleGrantedAuthority("ROLE_USER")
+                        ))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody))
                 .andDo(print())
@@ -149,11 +154,13 @@ class CouponIssueControllerTest {
                 """;
 
         // 존재하지 않는 사용자 발급 요청이 404로 처리되는지 검증함
-        mockMvc.perform(post(
+                mockMvc.perform(post(
                         "/api/coupons/{couponId}/issues",
                         coupon.getId()
                 )
-                        .with(jwt())
+                        .with(jwt().authorities(
+                                new SimpleGrantedAuthority("ROLE_USER")
+                        ))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody))
                 .andDo(print())
@@ -183,21 +190,25 @@ class CouponIssueControllerTest {
                 """.formatted(user.getId());
 
         // 첫 번째 쿠폰 발급을 성공시킴
-        mockMvc.perform(post(
+                mockMvc.perform(post(
                         "/api/coupons/{couponId}/issues",
                         coupon.getId()
                 )
-                        .with(jwt())
+                        .with(jwt().authorities(
+                                new SimpleGrantedAuthority("ROLE_USER")
+                        ))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody))
                 .andExpect(status().isCreated());
 
         // 동일한 사용자로 다시 발급 요청하여 중복 여부를 검증함
-        mockMvc.perform(post(
+                mockMvc.perform(post(
                         "/api/coupons/{couponId}/issues",
                         coupon.getId()
                 )
-                        .with(jwt())
+                        .with(jwt().authorities(
+                                new SimpleGrantedAuthority("ROLE_USER")
+                        ))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody))
                 .andDo(print())
@@ -222,11 +233,13 @@ class CouponIssueControllerTest {
                 """;
 
         // 사용자 ID가 없는 요청이 400으로 처리되는지 검증함
-        mockMvc.perform(post(
+                mockMvc.perform(post(
                         "/api/coupons/{couponId}/issues",
                         1L
                 )
-                        .with(jwt())
+                        .with(jwt().authorities(
+                                new SimpleGrantedAuthority("ROLE_USER")
+                        ))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody))
                 .andDo(print())

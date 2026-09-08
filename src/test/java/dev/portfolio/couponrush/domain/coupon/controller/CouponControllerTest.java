@@ -9,6 +9,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.http.MediaType;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.web.servlet.MockMvc;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
@@ -64,7 +65,9 @@ class CouponControllerTest {
 
         // POST 요청을 보내고 생성 응답을 검증함
         mockMvc.perform(post("/api/coupons")
-                        .with(jwt())
+                        .with(jwt().authorities(
+                                new SimpleGrantedAuthority("ROLE_ADMIN")
+                        ))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody))
                 .andDo(print())
@@ -106,13 +109,17 @@ class CouponControllerTest {
 
         // 쿠폰 두 개를 생성함
         mockMvc.perform(post("/api/coupons")
-                        .with(jwt())
+                        .with(jwt().authorities(
+                                new SimpleGrantedAuthority("ROLE_ADMIN")
+                        ))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(firstRequest))
                 .andExpect(status().isCreated());
 
         mockMvc.perform(post("/api/coupons")
-                        .with(jwt())
+                        .with(jwt().authorities(
+                                new SimpleGrantedAuthority("ROLE_ADMIN")
+                        ))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(secondRequest))
                 .andExpect(status().isCreated());
@@ -141,7 +148,9 @@ class CouponControllerTest {
 
         // 요청값 검증 실패 시 400 응답과 공통 오류 코드를 반환하는지 검증함
         mockMvc.perform(post("/api/coupons")
-                        .with(jwt())
+                        .with(jwt().authorities(
+                                new SimpleGrantedAuthority("ROLE_ADMIN")
+                        ))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody))
                 .andDo(print())
@@ -149,6 +158,29 @@ class CouponControllerTest {
                 .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
 
         log.info("쿠폰 생성 요청값 검증 실패 테스트 성공");
+    }
+
+    @Test
+    void createCouponWithUserRoleFails() throws Exception {
+        String requestBody = """
+                {
+                  "name": "권한 테스트 쿠폰",
+                  "discountAmount": 1000,
+                  "totalQuantity": 100,
+                  "startsAt": "2026-08-10T10:00:00",
+                  "endsAt": "2026-08-10T18:00:00"
+                }
+                """;
+
+        // 일반 사용자는 관리자용 쿠폰 생성 API에 접근할 수 없는지 검증함
+        mockMvc.perform(post("/api/coupons")
+                        .with(jwt().authorities(
+                                new SimpleGrantedAuthority("ROLE_USER")
+                        ))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andDo(print())
+                .andExpect(status().isForbidden());
     }
 
     @Test
