@@ -5,9 +5,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
 import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.test.context.TestPropertySource;
@@ -23,7 +25,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -57,10 +59,17 @@ class SecurityConfigTest {
 
     @Test
     void accessProtectedApiWithoutTokenFails() throws Exception {
-        // 보호 API는 JWT가 없으면 Controller 실행 전에 401로 차단되는지 검증함
+        // JWT 없이 보호 API에 접근하면 공통 401 응답을 반환하는지 검증함
         mockMvc.perform(get("/api/users/{userId}", 999L))
                 .andDo(print())
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isUnauthorized())
+                .andExpect(content().contentTypeCompatibleWith(
+                        MediaType.APPLICATION_JSON
+                ))
+                .andExpect(jsonPath("$.code")
+                        .value("AUTHENTICATION_REQUIRED"))
+                .andExpect(jsonPath("$.message")
+                        .value("인증이 필요합니다."));
     }
 
     @Test
@@ -118,5 +127,48 @@ class SecurityConfigTest {
         assertThat(authentication.getAuthorities())
                 .extracting(GrantedAuthority::getAuthority)
                 .containsExactly("ROLE_USER");
+    }
+
+    @Test
+    void accessProtectedApiWithInvalidTokenFails() throws Exception {
+        // 형식이 잘못된 JWT가 Resource Server에서 거부되는지 검증함
+        mockMvc.perform(get("/api/users/{userId}", 999L)
+                        .header(
+                                HttpHeaders.AUTHORIZATION,
+                                "Bearer invalid-token"
+                        ))
+                .andDo(print())
+                .andExpect(status().isUnauthorized())
+                .andExpect(content().contentTypeCompatibleWith(
+                        MediaType.APPLICATION_JSON
+                ))
+                .andExpect(jsonPath("$.code")
+                        .value("AUTHENTICATION_REQUIRED"))
+                .andExpect(jsonPath("$.message")
+                        .value("인증이 필요합니다."));
+    }
+
+    @Test
+    void accessAdminApiWithUserRoleFails() throws Exception {
+        // USER 권한으로 관리자 전용 쿠폰 생성 API를 호출함
+        mockMvc.perform(post("/api/coupons")
+                        .with(jwt()
+                                .jwt(jwtBuilder ->
+                                        jwtBuilder.subject("1")
+                                )
+                                .authorities(
+                                        new SimpleGrantedAuthority("ROLE_USER")
+                                ))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andDo(print())
+                .andExpect(status().isForbidden())
+                .andExpect(content().contentTypeCompatibleWith(
+                        MediaType.APPLICATION_JSON
+                ))
+                .andExpect(jsonPath("$.code")
+                        .value("ACCESS_DENIED"))
+                .andExpect(jsonPath("$.message")
+                        .value("접근 권한이 없습니다."));
     }
 }

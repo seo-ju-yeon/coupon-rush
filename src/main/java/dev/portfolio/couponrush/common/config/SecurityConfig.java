@@ -1,5 +1,7 @@
 package dev.portfolio.couponrush.common.config;
 
+import dev.portfolio.couponrush.common.security.JwtAccessDeniedHandler;
+import dev.portfolio.couponrush.common.security.JwtAuthenticationEntryPoint;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -45,7 +47,9 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(
             HttpSecurity httpSecurity,
-            JwtAuthenticationConverter jwtAuthenticationConverter
+            JwtAuthenticationConverter jwtAuthenticationConverter,
+            JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint,
+            JwtAccessDeniedHandler jwtAccessDeniedHandler
     ) throws Exception {
         httpSecurity
                 // Authorization 헤더의 JWT를 사용하므로 CSRF 보호를 비활성화 함
@@ -60,6 +64,12 @@ public class SecurityConfig {
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(
                                 SessionCreationPolicy.STATELESS)
+                )
+
+                // 인증 및 권한 검사 실패 시 공통 JSON 응답을 반환하도록 설정함
+                .exceptionHandling(exception -> exception
+                        .authenticationEntryPoint(jwtAuthenticationEntryPoint)
+                        .accessDeniedHandler(jwtAccessDeniedHandler)
                 )
 
                 // 요청 URL과 HTTP 메서드에 따라 접근 권한을 설정함
@@ -113,6 +123,16 @@ public class SecurityConfig {
                 // Authorization: Bearer 헤더의 JWT를 검증함
                 // SpringSecurity에게 현재 서버가 Bearer Token을 받는 ResourceServer라고 설정
                 .oauth2ResourceServer(resourceServer -> {
+                    // JWT가 잘못되었거나 만료된 경우 401 JSON 응답을 반환함
+                    resourceServer.authenticationEntryPoint(
+                            jwtAuthenticationEntryPoint
+                    );
+
+                    // JWT는 유효하지만 권한이 부족한 경우 403 JSON 응답을 반환함
+                    resourceServer.accessDeniedHandler(
+                            jwtAccessDeniedHandler
+                    );
+
                     // Bearer Token 중 JWT 방식을 사용한다고 설정
                     resourceServer.jwt(jwtConfigurer -> {
                         // 검증된 JWT를 인증 객체로 변환기 사용하도록 설정
