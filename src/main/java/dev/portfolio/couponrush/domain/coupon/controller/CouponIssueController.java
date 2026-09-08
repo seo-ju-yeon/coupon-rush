@@ -6,6 +6,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
@@ -26,6 +27,7 @@ public class CouponIssueController {
 
     private final CouponIssueService couponIssueService;
 
+    @SecurityRequirement(name = "bearerAuth")
     @Operation(
             summary = "쿠폰 발급",
             description = "로그인한 사용자에게 쿠폰을 발급함"

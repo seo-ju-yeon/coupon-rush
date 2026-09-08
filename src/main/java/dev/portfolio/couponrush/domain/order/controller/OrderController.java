@@ -6,6 +6,7 @@ import dev.portfolio.couponrush.domain.order.service.OrderService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -27,6 +28,7 @@ public class OrderController {
 
     private final OrderService orderService;
 
+    @SecurityRequirement(name = "bearerAuth")
     @Operation(
             summary = "주문 생성",
             description = "로그인한 사용자가 발급받은 쿠폰으로 주문을 생성함"

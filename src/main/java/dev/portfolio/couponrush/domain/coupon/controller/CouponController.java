@@ -7,6 +7,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +29,7 @@ public class CouponController {
 
     private final CouponService couponService;
 
+    @SecurityRequirement(name = "bearerAuth")
     @Operation(
             summary = "쿠폰 생성",
             description = "쿠폰 정보와 발급 수량 및 기간을 입력받아 새로운 쿠폰을 생성함"
