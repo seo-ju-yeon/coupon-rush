@@ -1,6 +1,5 @@
 package dev.portfolio.couponrush.domain.coupon.controller;
 
-import dev.portfolio.couponrush.domain.coupon.dto.CouponIssueCreateRequest;
 import dev.portfolio.couponrush.domain.coupon.dto.CouponIssueResponse;
 import dev.portfolio.couponrush.domain.coupon.service.CouponIssueService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -8,10 +7,11 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
 @Tag(
@@ -28,7 +28,7 @@ public class CouponIssueController {
 
     @Operation(
             summary = "쿠폰 발급",
-            description = "쿠폰 ID와 사용자 ID를 받아 해당 사용자에게 쿠폰을 발급함"
+            description = "로그인한 사용자에게 쿠폰을 발급함"
     )
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "쿠폰 발급 성공"),
@@ -41,12 +41,17 @@ public class CouponIssueController {
     public CouponIssueResponse issueResponse(
             @Parameter(description = "발급할 쿠폰 ID", example = "1")
             @PathVariable Long couponId,
-            @Valid @RequestBody CouponIssueCreateRequest request
+            // Spring Security가 검증한 JWT를 현재 인증 사용자 정보로 주입받음
+            @AuthenticationPrincipal Jwt jwt
     ) {
+        // JWT의 subject에는 로그인한 사용자 ID가 문자열로 저장되어 있음
+        Long userId = Long.valueOf(jwt.getSubject());
+
         log.info("쿠폰 발급 API 요청: couponId={}, userId={}",
                 couponId,
-                request.getUserId());
+                userId
+        );
 
-        return couponIssueService.issueCoupon(couponId, request);
+        return couponIssueService.issueCoupon(couponId, userId);
     }
 }

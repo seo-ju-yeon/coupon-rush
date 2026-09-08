@@ -2,7 +2,6 @@ package dev.portfolio.couponrush.domain.coupon.service;
 
 import dev.portfolio.couponrush.common.exception.BusinessException;
 import dev.portfolio.couponrush.common.exception.ErrorCode;
-import dev.portfolio.couponrush.domain.coupon.dto.CouponIssueCreateRequest;
 import dev.portfolio.couponrush.domain.coupon.dto.CouponIssueResponse;
 import dev.portfolio.couponrush.domain.coupon.entity.Coupon;
 import dev.portfolio.couponrush.domain.coupon.entity.CouponIssueStatus;
@@ -17,7 +16,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
-import org.springframework.test.util.ReflectionTestUtils;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -72,10 +70,11 @@ class CouponIssueServiceTest {
                 createOpenCoupon("쿠폰 발급 테스트 쿠폰", 100)
         );
 
-        CouponIssueCreateRequest request = createRequest(user.getId());
-
-        // 쿠폰 발급 Service를 호출함
-        CouponIssueResponse response = couponIssueService.issueCoupon(coupon.getId(), request);
+        CouponIssueResponse response =
+                couponIssueService.issueCoupon(
+                        coupon.getId(),
+                        user.getId()
+                );
 
         Coupon savedCoupon = couponRepository.findById(coupon.getId()).orElseThrow();
 
@@ -106,14 +105,11 @@ class CouponIssueServiceTest {
                 new User("not-found-coupon@example.com", "tester", TEST_PASSWORD_HASH)
         );
 
-        CouponIssueCreateRequest request =
-                createRequest(user.getId());
-
         // 존재하지 않는 쿠폰 발급 시 예외가 발생하는지 확인함
         try {
             couponIssueService.issueCoupon(
                     notFoundCouponId,
-                    request
+                    user.getId()
             );
 
             fail("예외가 발생해야 하는데 발생하지 않았습니다.");
@@ -136,20 +132,20 @@ class CouponIssueServiceTest {
                 createOpenCoupon("없는 사용자 테스트 쿠폰", 100));
 
         // 존재하지 않는 사용자 ID를 준비함
-        CouponIssueCreateRequest request = createRequest(999L);
+        Long notFoundUserID = 999L;
 
         // 존재하지 않는 사용자 발급 시 예외가 발생하는지 확인함
         try {
             couponIssueService.issueCoupon(
                     coupon.getId(),
-                    request
+                    notFoundUserID
             );
 
             fail("예외가 발생해야 하는데 발생하지 않았습니다.");
         } catch (BusinessException e) {
             log.info(
                     "없는 사용자 쿠폰 발급 실패 확인: userId={}, message={}",
-                    request.getUserId(),
+                    notFoundUserID,
                     e.getMessage()
             );
 
@@ -176,13 +172,11 @@ class CouponIssueServiceTest {
                 )
         );
 
-        CouponIssueCreateRequest request = createRequest(user.getId());
-
         // OPEN 상태가 아닌 쿠폰 발급 시 예외가 발생하는지 확인함
         try {
             couponIssueService.issueCoupon(
                     coupon.getId(),
-                    request
+                    user.getId()
             );
 
             fail("예외가 발생해야 하는데 발생하지 않았습니다.");
@@ -215,13 +209,11 @@ class CouponIssueServiceTest {
                 )
         );
 
-        CouponIssueCreateRequest request = createRequest(user.getId());
-
         // 발급 기간이 아닌 쿠폰 발급 시 예외가 발생하는지 확인함
         try {
             couponIssueService.issueCoupon(
                     coupon.getId(),
-                    request
+                    user.getId()
             );
 
             fail("예외가 발생해야 하는데 발생하지 않았습니다.");
@@ -253,7 +245,7 @@ class CouponIssueServiceTest {
         // 첫 번째 발급으로 수량을 모두 소진함
         couponIssueService.issueCoupon(
                 coupon.getId(),
-                createRequest(firstUser.getId())
+                firstUser.getId()
         );
 
         // 두 번째 사용자를 저장함
@@ -265,7 +257,7 @@ class CouponIssueServiceTest {
         try {
             couponIssueService.issueCoupon(
                     coupon.getId(),
-                    createRequest(secondUser.getId())
+                    secondUser.getId()
             );
 
             fail("예외가 발생해야 하는데 발생하지 않았습니다.");
@@ -292,20 +284,17 @@ class CouponIssueServiceTest {
                 createOpenCoupon("중복 발급 테스트 쿠폰", 100)
         );
 
-        CouponIssueCreateRequest request =
-                createRequest(user.getId());
-
         // 첫 번째 쿠폰 발급을 성공시킴
         couponIssueService.issueCoupon(
                 coupon.getId(),
-                request
+                user.getId()
         );
 
         // 동일한 사용자로 다시 쿠폰 발급을 시도함
         try {
             couponIssueService.issueCoupon(
                     coupon.getId(),
-                    request
+                    user.getId()
             );
 
             fail("예외가 발생해야 하는데 발생하지 않았습니다.");
@@ -320,15 +309,6 @@ class CouponIssueServiceTest {
             assertThat(e.getErrorCode())
                     .isEqualTo(ErrorCode.DUPLICATE_COUPON_ISSUE);
         }
-    }
-
-    private CouponIssueCreateRequest createRequest(Long userId) {
-        // setter 없이 테스트 요청 DTO의 private 필드에 값을 주입함
-        CouponIssueCreateRequest request = new CouponIssueCreateRequest();
-
-        ReflectionTestUtils.setField(request, "userId", userId);
-
-        return request;
     }
 
     private Coupon createOpenCoupon(String name, Integer totalQuantity) {

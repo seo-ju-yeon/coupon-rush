@@ -2,7 +2,6 @@ package dev.portfolio.couponrush.domain.coupon.service;
 
 import dev.portfolio.couponrush.common.exception.BusinessException;
 import dev.portfolio.couponrush.common.exception.ErrorCode;
-import dev.portfolio.couponrush.domain.coupon.dto.CouponIssueCreateRequest;
 import dev.portfolio.couponrush.domain.coupon.dto.CouponIssueResponse;
 import dev.portfolio.couponrush.domain.coupon.entity.Coupon;
 import dev.portfolio.couponrush.domain.coupon.entity.CouponIssue;
@@ -24,15 +23,12 @@ import java.time.LocalDateTime;
 @Transactional(readOnly = true)
 public class CouponIssueService {
     /*
-    처리 흐름:
+    쿠폰 발급 처리 흐름
     1. 쿠폰 조회
-    2. 사용자 조회
-    3. 쿠폰 상태 확인
-    4. 발급 기간 확인
-    5. 중복 발급 확인
-    6. 쿠폰 수량 증가
-    7. CouponIssue 저장
-    8. 응답 DTO 반환
+    2. JWT에서 전달받은 사용자 ID로 사용자 조회
+    3. 쿠폰 상태, 발급 기간, 중복 발급 여부 확인
+    4. 발급 수량 증가 및 발급 내역 저장
+    5. 발급 결과 반환
      */
 
     private final CouponIssueRepository couponIssueRepository;
@@ -42,9 +38,9 @@ public class CouponIssueService {
     @Transactional
     public CouponIssueResponse issueCoupon(
             Long couponId,
-            CouponIssueCreateRequest request
+            Long userId
     ) {
-        log.info("쿠폰 발급 요청: couponId={}, userId={}", couponId, request.getUserId());
+        log.info("쿠폰 발급 요청: couponId={}, userId={}", couponId, userId);
 
         // DB 행을 잠그지 않고 조회하며 저장 시 @Version으로 변경 충돌을 감지함
         Coupon coupon = couponRepository.findById(couponId)
@@ -52,14 +48,20 @@ public class CouponIssueService {
                         ErrorCode.COUPON_NOT_FOUND
                 ));
 
-        User user = userRepository.findById(request.getUserId())
+        // JWT에서 가져온 사용자 ID로 사용자 조회함
+        User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(
                         ErrorCode.USER_NOT_FOUND
                 ));
 
+        // 현재 발급할 수 있는 상태와 기간인지 확인함
         validateCouponIssuable(coupon);
 
-        boolean alreadyIssued = couponIssueRepository.existsByCoupon_IdAndUser_Id(couponId, request.getUserId());
+        // 같은 사용자가 이미 발급받은 쿠폰인지 확인함
+        boolean alreadyIssued =
+                couponIssueRepository.existsByCoupon_IdAndUser_Id(
+                        couponId, userId
+                );
 
         if (alreadyIssued) {
             throw new BusinessException(ErrorCode.DUPLICATE_COUPON_ISSUE);
@@ -67,13 +69,14 @@ public class CouponIssueService {
 
         coupon.increaseIssueQuantity();
 
+        // 쿠폰 발급 내역 저장함
         CouponIssue couponIssue = new CouponIssue(coupon, user);
         CouponIssue savedCouponIssue = couponIssueRepository.save(couponIssue);
 
         log.info("쿠폰 발급 완료: issuedId={}, couponId={}, userId={}, status={}",
                 savedCouponIssue.getId(),
                 couponId,
-                request.getUserId(),
+                userId,
                 savedCouponIssue.getStatus());
 
         return CouponIssueResponse.from(savedCouponIssue);

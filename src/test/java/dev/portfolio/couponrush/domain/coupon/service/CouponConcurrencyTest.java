@@ -2,7 +2,6 @@ package dev.portfolio.couponrush.domain.coupon.service;
 
 import dev.portfolio.couponrush.common.exception.BusinessException;
 import dev.portfolio.couponrush.common.exception.ErrorCode;
-import dev.portfolio.couponrush.domain.coupon.dto.CouponIssueCreateRequest;
 import dev.portfolio.couponrush.domain.coupon.entity.Coupon;
 import dev.portfolio.couponrush.domain.coupon.entity.CouponStatus;
 import dev.portfolio.couponrush.domain.coupon.repository.CouponIssueRepository;
@@ -16,7 +15,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.dao.OptimisticLockingFailureException;
-import org.springframework.test.util.ReflectionTestUtils;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -138,12 +136,10 @@ class CouponConcurrencyTest {
                         // 시작 신호가 올 때까지 대기함
                         startLatch.await();
 
-                        CouponIssueCreateRequest request =
-                                createRequest(user.getId());
-
                         couponIssueService.issueCoupon(
                                 coupon.getId(),
-                                request);
+                                user.getId()
+                        );
 
                         successCount.incrementAndGet();
                     } catch (BusinessException e) {
@@ -268,19 +264,6 @@ class CouponConcurrencyTest {
 
         assertThat(unexpectedFailureTypes)
                 .isEmpty();
-    }
-
-    private CouponIssueCreateRequest createRequest(Long userId) {
-        // setter 없이 테스트 요청 DTO의 private 필드에 값을 주입함
-        CouponIssueCreateRequest request = new CouponIssueCreateRequest();
-
-        ReflectionTestUtils.setField(
-                request,
-                "userId",
-                userId
-        );
-
-        return request;
     }
 
 }

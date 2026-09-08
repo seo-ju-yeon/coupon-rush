@@ -14,7 +14,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
-import org.springframework.http.MediaType;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.web.servlet.MockMvc;
 import org.testcontainers.containers.PostgreSQLContainer;
@@ -24,7 +23,6 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import java.time.LocalDateTime;
 
 import static org.hamcrest.Matchers.notNullValue;
-import static org.junit.jupiter.api.Assertions.*;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
@@ -78,22 +76,18 @@ class CouponIssueControllerTest {
                 createOpenCoupon("Controller 쿠폰 발급 테스트 쿠폰")
         );
 
-        String requestBody = """
-                {
-                  "userId": %d
-                }
-                """.formatted(user.getId());
-
         // 쿠폰 발급 API를 호출하고 응답을 검증함
         mockMvc.perform(post(
                         "/api/coupons/{couponId}/issues",
                         coupon.getId()
                 )
-                        .with(jwt().authorities(
-                                new SimpleGrantedAuthority("ROLE_USER")
-                        ))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(requestBody))
+                        .with(jwt()
+                                .jwt(jwt -> jwt
+                                        .subject(user.getId().toString())
+                                )
+                                .authorities(
+                                        new SimpleGrantedAuthority("ROLE_USER")
+                                )))
                 .andDo(print())
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id", notNullValue()))
@@ -114,22 +108,16 @@ class CouponIssueControllerTest {
     void issueCouponWithNotFoundCouponFails() throws Exception {
         Long notFoundCouponId = 999L;
 
-        String requestBody = """
-                {
-                    "userId": 1
-                }
-                """;
-
         // 존재하지 않는 쿠폰 발급 요청이 404로 처리되는지 검증함
-                mockMvc.perform(post(
+        mockMvc.perform(post(
                         "/api/coupons/{couponId}/issues",
                         notFoundCouponId
                 )
-                        .with(jwt().authorities(
-                                new SimpleGrantedAuthority("ROLE_USER")
-                        ))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(requestBody))
+                        .with(jwt()
+                                .jwt(jwt -> jwt.subject("1"))
+                                .authorities(
+                                        new SimpleGrantedAuthority("ROLE_USER")
+                                )))
                 .andDo(print())
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code")
@@ -147,22 +135,16 @@ class CouponIssueControllerTest {
                 createOpenCoupon("없는 사용자 테스트 쿠폰")
         );
 
-        String requestBody = """
-                {
-                    "userId": 999
-                }
-                """;
-
         // 존재하지 않는 사용자 발급 요청이 404로 처리되는지 검증함
-                mockMvc.perform(post(
+        mockMvc.perform(post(
                         "/api/coupons/{couponId}/issues",
                         coupon.getId()
                 )
-                        .with(jwt().authorities(
-                                new SimpleGrantedAuthority("ROLE_USER")
-                        ))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(requestBody))
+                        .with(jwt()
+                                .jwt(jwt -> jwt.subject("999"))
+                                .authorities(
+                                        new SimpleGrantedAuthority("ROLE_USER")
+                                )))
                 .andDo(print())
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code")
@@ -183,34 +165,32 @@ class CouponIssueControllerTest {
                 createOpenCoupon("중복 발급 테스트 쿠폰")
         );
 
-        String requestBody = """
-                {
-                  "userId": %d
-                }
-                """.formatted(user.getId());
-
         // 첫 번째 쿠폰 발급을 성공시킴
-                mockMvc.perform(post(
+        mockMvc.perform(post(
                         "/api/coupons/{couponId}/issues",
                         coupon.getId()
                 )
-                        .with(jwt().authorities(
-                                new SimpleGrantedAuthority("ROLE_USER")
-                        ))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(requestBody))
+                        .with(jwt()
+                                .jwt(jwt -> jwt
+                                        .subject(user.getId().toString())
+                                )
+                                .authorities(
+                                        new SimpleGrantedAuthority("ROLE_USER")
+                                )))
                 .andExpect(status().isCreated());
 
         // 동일한 사용자로 다시 발급 요청하여 중복 여부를 검증함
-                mockMvc.perform(post(
+        mockMvc.perform(post(
                         "/api/coupons/{couponId}/issues",
                         coupon.getId()
                 )
-                        .with(jwt().authorities(
-                                new SimpleGrantedAuthority("ROLE_USER")
-                        ))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(requestBody))
+                        .with(jwt()
+                                .jwt(jwt -> jwt
+                                        .subject(user.getId().toString())
+                                )
+                                .authorities(
+                                        new SimpleGrantedAuthority("ROLE_USER")
+                                )))
                 .andDo(print())
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code")
@@ -225,29 +205,16 @@ class CouponIssueControllerTest {
     }
 
     @Test
-    void issueCouponWithInvalidRequestFails() throws Exception {
-        String requestBody = """
-                {
-                  "userId": null
-                }
-                """;
-
-        // 사용자 ID가 없는 요청이 400으로 처리되는지 검증함
-                mockMvc.perform(post(
+    void issueCouponWithoutTokenFails() throws Exception {
+        // 인증되지 않은 사용자의 쿠폰 발급 요청이 차단되는지 검증함
+        mockMvc.perform(post(
                         "/api/coupons/{couponId}/issues",
                         1L
-                )
-                        .with(jwt().authorities(
-                                new SimpleGrantedAuthority("ROLE_USER")
-                        ))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(requestBody))
+                ))
                 .andDo(print())
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code")
-                        .value("VALIDATION_ERROR"));
+                .andExpect(status().isUnauthorized());
 
-        log.info("쿠폰 발급 요청값 검증 실패 테스트 성공");
+        log.info("인증되지 않은 쿠폰 발급 요청 실패 테스트 성공");
     }
 
     private Coupon createOpenCoupon(String name) {
