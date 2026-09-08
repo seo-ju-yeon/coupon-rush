@@ -6,12 +6,19 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.AbstractAuthenticationToken;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import java.time.Instant;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -36,6 +43,9 @@ class SecurityConfigTest {
 
     @Autowired
     MockMvc mockMvc;
+
+    @Autowired
+    JwtAuthenticationConverter jwtAuthenticationConverter;
 
     @Test
     void accessPublicCouponApiWithoutToken() throws Exception {
@@ -82,5 +92,31 @@ class SecurityConfigTest {
                         .content(invalidRequestBody))
                 .andDo(print())
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void convertRoleClaimToAuthority() {
+        Instant issuedAt = Instant.now();
+
+        // 권한 변환 테스트에 사용할 가짜 JWT 객체를 생성함
+        Jwt jwt = Jwt.withTokenValue("test-token")
+                .header("alg", "HS256")
+                .subject("1")
+                .issuedAt(issuedAt)
+                .expiresAt(issuedAt.plusSeconds(3600))
+                .claim("email", "security@example.com")
+                .claim("role", "USER")
+                .build();
+
+        // JWT를 Spring Security 인증 객체로 변환함
+        AbstractAuthenticationToken authentication =
+                jwtAuthenticationConverter.convert(jwt);
+
+        assertThat(authentication).isNotNull();
+
+        // JWT의 USER가 Spring Security의 ROLE_USER로 변환되었는지 검증함
+        assertThat(authentication.getAuthorities())
+                .extracting(GrantedAuthority::getAuthority)
+                .containsExactly("ROLE_USER");
     }
 }

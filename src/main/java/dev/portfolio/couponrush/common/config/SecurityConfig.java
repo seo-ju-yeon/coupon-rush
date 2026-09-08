@@ -3,12 +3,13 @@ package dev.portfolio.couponrush.common.config;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
-import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
+import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.web.SecurityFilterChain;
 
 @Configuration
@@ -20,8 +21,32 @@ public class SecurityConfig {
         return new BCryptPasswordEncoder();
     }
 
+    // JWT의 role Claim을 Spring Security 권한으로 변환함
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity httpSecurity) throws Exception {
+    public JwtAuthenticationConverter jwtAuthenticationConverter() {
+        // JwtGrantedAuthoritiesConverter: JWT에서 권한만 변환함
+        JwtGrantedAuthoritiesConverter authoritiesConverter = new JwtGrantedAuthoritiesConverter();
+
+        // JWT에서 권한으로 사용할 Claim 이름을 지정함
+        authoritiesConverter.setAuthoritiesClaimName("role");
+        // USER를 ROLE_USER 형식으로 변환함
+        authoritiesConverter.setAuthorityPrefix("ROLE_");
+
+        // JwtAuthenticationConverter: JWT 전체를 인증된 사용자 객체로 변환함
+        JwtAuthenticationConverter authenticationConverter = new JwtAuthenticationConverter();
+
+        authenticationConverter.setJwtGrantedAuthoritiesConverter(
+                authoritiesConverter
+        );
+
+        return authenticationConverter;
+    }
+
+    @Bean
+    public SecurityFilterChain securityFilterChain(
+            HttpSecurity httpSecurity,
+            JwtAuthenticationConverter jwtAuthenticationConverter
+    ) throws Exception {
         httpSecurity
                 // Authorization 헤더의 JWT를 사용하므로 CSRF 보호를 비활성화 함
                 .csrf(AbstractHttpConfigurer::disable)
@@ -68,9 +93,16 @@ public class SecurityConfig {
                 )
 
                 // Authorization: Bearer 헤더의 JWT를 검증함
-                .oauth2ResourceServer(oauth2 -> oauth2
-                        .jwt(Customizer.withDefaults())
-                );
+                // SpringSecurity에게 현재 서버가 Bearer Token을 받는 ResourceServer라고 설정
+                .oauth2ResourceServer(resourceServer -> {
+                    // Bearer Token 중 JWT 방식을 사용한다고 설정
+                    resourceServer.jwt(jwtConfigurer -> {
+                        // 검증된 JWT를 인증 객체로 변환기 사용하도록 설정
+                        jwtConfigurer.jwtAuthenticationConverter(
+                                jwtAuthenticationConverter
+                        );
+                    });
+                });
 
         return httpSecurity.build();
     }
