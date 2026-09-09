@@ -1,7 +1,7 @@
 package dev.portfolio.couponrush.domain.coupon.controller;
 
 import dev.portfolio.couponrush.domain.coupon.dto.CouponIssueResponse;
-import dev.portfolio.couponrush.domain.coupon.service.CouponIssueService;
+import dev.portfolio.couponrush.domain.coupon.service.CouponIssueRedisLockFacade;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -25,7 +25,8 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/coupons")
 public class CouponIssueController {
 
-    private final CouponIssueService couponIssueService;
+    // 쿠폰 발급 전 Redis 분산 락을 적용하기 위해 Facade를 호출함
+    private final CouponIssueRedisLockFacade couponIssueRedisLockFacade;
 
     @SecurityRequirement(name = "bearerAuth")
     @Operation(
@@ -54,6 +55,9 @@ public class CouponIssueController {
                 userId
         );
 
-        return couponIssueService.issueCoupon(couponId, userId);
+        return couponIssueRedisLockFacade.issueCoupon(
+                couponId,
+                userId
+        );
     }
 }

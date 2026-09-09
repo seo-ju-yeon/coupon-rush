@@ -15,10 +15,14 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
+import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.utility.DockerImageName;
 
 import java.time.LocalDateTime;
 
@@ -43,6 +47,30 @@ class CouponIssueControllerTest {
     @ServiceConnection
     // 테스트 클래스 실행 동안 사용할 PostgreSQL 컨테이너를 정의함
     static PostgreSQLContainer<?> postgreSQLContainer = new PostgreSQLContainer<>("postgres:16");
+
+    @Container
+    // Redis 컨테이너 정의
+    static GenericContainer<?> redisContainer =
+            new GenericContainer<>(
+                    DockerImageName.parse("redis:7.4.11-alpine")
+            )
+                    .withExposedPorts(6379);
+
+    @DynamicPropertySource
+    static void registerRedisProperties(
+            DynamicPropertyRegistry registry
+    ) {
+        // 테스트 Redis의 동적으로 할당된 접속 정보를 Spring 설정에 등록함
+        registry.add(
+                "spring.data.redis.host",
+                redisContainer::getHost
+        );
+        registry.add(
+                "spring.data.redis.port",
+                () -> redisContainer.getMappedPort(6379)
+        );
+
+    }
 
     @Autowired
     // HTTP 요청을 보내는 테스트 도구를 주입받음
@@ -218,7 +246,7 @@ class CouponIssueControllerTest {
     }
 
     private Coupon createOpenCoupon(String name) {
-        // 현재 발급 간으한 OPEN 상태의 쿠폰을 생성함
+        // 현재 발급 가능한 OPEN 상태의 쿠폰을 생성함
         return new Coupon(
                 name,
                 1000,

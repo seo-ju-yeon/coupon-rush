@@ -53,6 +53,10 @@ public enum ErrorCode {
             HttpStatus.NOT_FOUND,
             "쿠폰 발급 내역을 찾을 수 없습니다."
     ),
+    COUPON_ISSUE_LOCK_TIMEOUT(
+            HttpStatus.SERVICE_UNAVAILABLE,
+            "쿠폰 발급 요청이 많습니다. 잠시 후 다시 시도해 주세요."
+    ),
     DUPLICATE_COUPON_ISSUE(
             HttpStatus.CONFLICT,
             "이미 발급받은 쿠폰입니다."
