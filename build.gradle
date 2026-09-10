@@ -64,4 +64,8 @@ dependencies {
 
 tasks.named('test') {
     useJUnitPlatform()
+
+    // 모든 테스트가 로컬 환경변수에 의존하지 않도록 테스트 전용 JWT 키를 전달함
+    environment 'JWT_SECRET',
+            'MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDE='
 }
