@@ -1,6 +1,8 @@
 package dev.portfolio.couponrush.common.exception;
 
 import lombok.extern.log4j.Log4j2;
+import org.hibernate.exception.ConstraintViolationException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -22,6 +24,29 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .status(errorCode.getStatus())
                 .body(ErrorResponse.of(errorCode));
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ErrorResponse> handleDataIntegrityViolation(
+            DataIntegrityViolationException exception
+    ) {
+        Throwable cause = exception.getCause();
+
+        while (cause != null) {
+            if (cause instanceof ConstraintViolationException violation
+                    && "23505".equals(violation.getSQLState())
+                    && "uk_orders_coupon_issue".equals(violation.getConstraintName())) {
+                ErrorCode errorCode = ErrorCode.COUPON_ISSUE_NOT_USABLE;
+
+                return ResponseEntity
+                        .status(errorCode.getStatus())
+                        .body(ErrorResponse.of(errorCode));
+            }
+
+            cause = cause.getCause();
+        }
+
+        throw exception;
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

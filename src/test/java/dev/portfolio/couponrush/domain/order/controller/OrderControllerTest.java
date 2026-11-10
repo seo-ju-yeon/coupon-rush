@@ -2,30 +2,47 @@ package dev.portfolio.couponrush.domain.order.controller;
 
 import dev.portfolio.couponrush.domain.coupon.entity.Coupon;
 import dev.portfolio.couponrush.domain.coupon.entity.CouponIssue;
+import dev.portfolio.couponrush.domain.coupon.entity.CouponIssueStatus;
 import dev.portfolio.couponrush.domain.coupon.entity.CouponStatus;
 import dev.portfolio.couponrush.domain.coupon.repository.CouponIssueRepository;
 import dev.portfolio.couponrush.domain.coupon.repository.CouponRepository;
+import dev.portfolio.couponrush.domain.order.entity.Order;
 import dev.portfolio.couponrush.domain.order.repository.OrderRepository;
 import dev.portfolio.couponrush.domain.user.entity.User;
 import dev.portfolio.couponrush.domain.user.repository.UserRepository;
 import lombok.extern.log4j.Log4j2;
+import org.hibernate.resource.jdbc.spi.StatementInspector;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.orm.jpa.HibernatePropertiesCustomizer;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -37,6 +54,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @Testcontainers
 @AutoConfigureMockMvc
+@Import(OrderControllerTest.ConcurrentOrderTestConfig.class)
 class OrderControllerTest {
 
     // 인증이 테스트 목적이 아니므로 고정된 임시 해시값을 사용함
@@ -46,6 +64,9 @@ class OrderControllerTest {
     @ServiceConnection
     static PostgreSQLContainer<?> postgreSQLContainer =
             new PostgreSQLContainer<>("postgres:16");
+
+    @Autowired
+    OrderInsertBarrier orderInsertBarrier;
 
     @Autowired
     MockMvc mockMvc;
@@ -247,6 +268,93 @@ class OrderControllerTest {
     }
 
     @Test
+    void createOrderWithDuplicateCouponIssueReturnsConflict() throws Exception {
+        User user = userRepository.saveAndFlush(
+                new User("order-conflict@example.com", "tester", TEST_PASSWORD_HASH)
+        );
+        Coupon coupon = couponRepository.saveAndFlush(createOpenCoupon());
+        CouponIssue couponIssue = couponIssueRepository.saveAndFlush(new CouponIssue(coupon, user));
+
+        // 다음 요청이 쿠폰 상태 검사를 통과해 DB의 UNIQUE 제약에 걸리도록
+        // 주문만 미리 저장하고 쿠폰 발급 내역은 ISSUED 상태로 둠
+        orderRepository.saveAndFlush(new Order(user, couponIssue, 10_000, 1_000));
+
+        String requestBody = """
+            {
+              "couponIssueId": %d,
+              "originalAmount": 10000
+            }
+            """.formatted(couponIssue.getId());
+
+        mockMvc.perform(post("/api/orders")
+                        .with(loginAs(user.getId()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("COUPON_ISSUE_NOT_USABLE"));
+    }
+
+    @Test
+    void concurrentOrdersWithSameCouponIssueReturnCreatedAndConflict() throws Exception {
+        User user = userRepository.saveAndFlush(
+                new User("order-race@example.com", "tester", TEST_PASSWORD_HASH)
+        );
+        Coupon coupon = couponRepository.saveAndFlush(createOpenCoupon());
+        CouponIssue couponIssue = couponIssueRepository.saveAndFlush(new CouponIssue(coupon, user));
+
+        String requestBody = """
+                {
+                  "couponIssueId": %d,
+                  "originalAmount": 10000
+                }
+                """.formatted(couponIssue.getId());
+
+        Callable<MvcResult> submitOrder = () -> mockMvc.perform(post("/api/orders")
+                        .with(loginAs(user.getId()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andReturn();
+
+        // 두 요청이 모두 쿠폰 상태 검사를 통과하고 주문 INSERT 직전에 도달할 때까지 기다림
+        CountDownLatch insertsReady = new CountDownLatch(2);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        orderInsertBarrier.pendingInserts = insertsReady;
+
+        MvcResult first;
+        MvcResult second;
+        try {
+            Future<MvcResult> firstRequest = executor.submit(submitOrder);
+            Future<MvcResult> secondRequest = executor.submit(submitOrder);
+            first = firstRequest.get(15, TimeUnit.SECONDS);
+            second = secondRequest.get(15, TimeUnit.SECONDS);
+        } finally {
+            orderInsertBarrier.pendingInserts = null;
+            executor.shutdownNow();
+        }
+
+        assertThat(insertsReady.getCount()).isZero();
+        int firstStatus = first.getResponse().getStatus();
+        assertThat(List.of(firstStatus, second.getResponse().getStatus()))
+                .containsExactlyInAnyOrder(201, 409);
+
+        MvcResult created = firstStatus == 201 ? first : second;
+        MvcResult conflict = firstStatus == 409 ? first : second;
+        // 409 응답이 실제 주문 저장 중 발생한 DB 제약 위반을 처리한 결과인지 확인함
+        assertThat(conflict.getResolvedException()).isInstanceOf(DataIntegrityViolationException.class);
+        jsonPath("$.code").value("COUPON_ISSUE_NOT_USABLE").match(conflict);
+
+        // 주문 한 건만 커밋됐고, 사용 처리된 쿠폰이 성공한 주문에 연결됐는지 확인함
+        List<Order> orders = orderRepository.findAll();
+        assertThat(orders).hasSize(1);
+        Long orderId = orders.getFirst().getId();
+        jsonPath("$.id").value(orderId).match(created);
+
+        CouponIssue usedIssue = couponIssueRepository.findById(couponIssue.getId()).orElseThrow();
+        assertThat(usedIssue.getStatus()).isEqualTo(CouponIssueStatus.USED);
+        assertThat(usedIssue.getUsedOrderId()).isEqualTo(orderId);
+    }
+
+    @Test
     void createOrderWithInvalidRequestFails() throws Exception {
         String requestBody = """
                 {
@@ -290,5 +398,46 @@ class OrderControllerTest {
                 .authorities(
                         new SimpleGrantedAuthority("ROLE_USER")
                 );
+    }
+
+    @TestConfiguration(proxyBeanMethods = false)
+    static class ConcurrentOrderTestConfig {
+
+        @Bean
+        OrderInsertBarrier orderInsertBarrier() {
+            return new OrderInsertBarrier();
+        }
+
+        @Bean
+        HibernatePropertiesCustomizer orderInsertInspector(OrderInsertBarrier barrier) {
+            return properties ->
+                    properties.put("hibernate.session_factory.statement_inspector", barrier);
+        }
+    }
+
+    static class OrderInsertBarrier implements StatementInspector {
+
+        private volatile CountDownLatch pendingInserts;
+
+        @Override
+        public String inspect(String sql) {
+            CountDownLatch inserts = pendingInserts;
+            if (inserts == null || !sql.stripLeading().startsWith("insert into orders ")) {
+                return sql;
+            }
+
+            // 두 요청이 쿠폰 상태 검사를 통과한 뒤 주문 INSERT를 시작하도록 맞춤
+            inserts.countDown();
+            try {
+                if (!inserts.await(5, TimeUnit.SECONDS)) {
+                    throw new IllegalStateException("두 요청이 주문 INSERT 직전까지 도달하지 않았습니다.");
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException("주문 INSERT 대기가 중단됐습니다.", e);
+            }
+
+            return sql;
+        }
     }
 }
