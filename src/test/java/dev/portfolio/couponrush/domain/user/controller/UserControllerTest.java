@@ -14,6 +14,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 
 import static org.hamcrest.Matchers.notNullValue;
@@ -87,16 +88,29 @@ class UserControllerTest {
                 ));
 
         // 사용자 단건 조회 API를 호출하고 응답을 검증함
-        mockMvc.perform(get("/api/users/{userId}", user.getId())
-                        .with(jwt()))
-                .andDo(print())
+        mockMvc.perform(get("/api/users/me")
+                        .with(jwt().jwt(builder ->
+                                builder.subject(user.getId().toString()))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(user.getId()))
-                .andExpect(jsonPath("$.email").value("controller-get@example.com"))
-                .andExpect(jsonPath("$.nickname").value("tester"))
-                .andExpect(jsonPath("$.createdAt", notNullValue()));
+                .andExpect(jsonPath("$.email").value("controller-get@example.com"));
 
         log.info("사용자 단건 조회 API 테스트 성공: userId={}", user.getId());
+    }
+
+    @Test
+    void cannotGetAnotherUserThroughOldEndpoint() throws Exception {
+        User requester = userRepository.saveAndFlush(
+                new User("requester@example.com", "requester", TEST_PASSWORD_HASH)
+        );
+        User otherUser = userRepository.saveAndFlush(
+                new User("other@example.com", "other", TEST_PASSWORD_HASH)
+        );
+
+        mockMvc.perform(get("/api/users/{userId}", otherUser.getId())
+                        .with(jwt().jwt(builder ->
+                                builder.subject(requester.getId().toString()))))
+                .andExpect(status().isNotFound());
     }
 
     @Test
@@ -159,9 +173,9 @@ class UserControllerTest {
         Long notFoundUserId = 999L;
 
         // 없는 사용자 조회 시 공통 오류 응답을 반환하는지 검증함
-        mockMvc.perform(get("/api/users/{userId}", notFoundUserId)
-                        .with(jwt()))
-                .andDo(print())
+        mockMvc.perform(get("/api/users/me")
+                        .with(jwt().jwt(builder ->
+                                builder.subject(notFoundUserId.toString()))))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("USER_NOT_FOUND"))
                 .andExpect(jsonPath("$.message").value("사용자를 찾을 수 없습니다."));
@@ -173,12 +187,12 @@ class UserControllerTest {
     void createUserWithShortPasswordFails() throws Exception {
         // 최소 길이를 충족하지 않는 비밀번호를 준비함
         String requestBody = """
-            {
-              "email": "short-password@example.com",
-              "nickname": "tester",
-              "password": "short"
-            }
-            """;
+                {
+                  "email": "short-password@example.com",
+                  "nickname": "tester",
+                  "password": "short"
+                }
+                """;
 
         // 비밀번호 길이 검증 실패 시 공통 오류 응답을 반환하는지 검증함
         mockMvc.perform(post("/api/users")

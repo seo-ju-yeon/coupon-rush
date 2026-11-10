@@ -60,30 +60,22 @@ class SecurityConfigTest {
     @Test
     void accessProtectedApiWithoutTokenFails() throws Exception {
         // JWT 없이 보호 API에 접근하면 공통 401 응답을 반환하는지 검증함
-        mockMvc.perform(get("/api/users/{userId}", 999L))
-                .andDo(print())
+        mockMvc.perform(get("/api/users/me"))
                 .andExpect(status().isUnauthorized())
-                .andExpect(content().contentTypeCompatibleWith(
-                        MediaType.APPLICATION_JSON
-                ))
-                .andExpect(jsonPath("$.code")
-                        .value("AUTHENTICATION_REQUIRED"))
-                .andExpect(jsonPath("$.message")
-                        .value("인증이 필요합니다."));
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.code").value("AUTHENTICATION_REQUIRED"))
+                .andExpect(jsonPath("$.message").value("인증이 필요합니다."));
     }
 
     @Test
     void accessProtectedApiWithJwt() throws Exception {
         // 테스트용 JWT 인증 정보를 SecurityContext에 넣어 보호 API를 호출함
-        mockMvc.perform(get("/api/users/{userId}", 999L)
-                        .with(jwt().jwt(jwt -> jwt
-                                .subject("1")
-                                .claim("email", "security@example.com")
-                                .claim("role", "USER")
-                        )))
-                .andDo(print())
+        mockMvc.perform(get("/api/users/me")
+                        .with(jwt().jwt(builder ->
+                                builder.subject(String.valueOf(Long.MAX_VALUE)))))
                 // 인증은 통과했지만 사용자가 없으므로 Controller에서 404를 반환함
-                .andExpect(status().isNotFound());
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("USER_NOT_FOUND"));
     }
 
     @Test
@@ -132,20 +124,12 @@ class SecurityConfigTest {
     @Test
     void accessProtectedApiWithInvalidTokenFails() throws Exception {
         // 형식이 잘못된 JWT가 Resource Server에서 거부되는지 검증함
-        mockMvc.perform(get("/api/users/{userId}", 999L)
-                        .header(
-                                HttpHeaders.AUTHORIZATION,
-                                "Bearer invalid-token"
-                        ))
-                .andDo(print())
+        mockMvc.perform(get("/api/users/me")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer invalid-token"))
                 .andExpect(status().isUnauthorized())
-                .andExpect(content().contentTypeCompatibleWith(
-                        MediaType.APPLICATION_JSON
-                ))
-                .andExpect(jsonPath("$.code")
-                        .value("AUTHENTICATION_REQUIRED"))
-                .andExpect(jsonPath("$.message")
-                        .value("인증이 필요합니다."));
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.code").value("AUTHENTICATION_REQUIRED"))
+                .andExpect(jsonPath("$.message").value("인증이 필요합니다."));
     }
 
     @Test

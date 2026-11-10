@@ -4,7 +4,6 @@ import dev.portfolio.couponrush.domain.user.dto.UserCreateRequest;
 import dev.portfolio.couponrush.domain.user.dto.UserResponse;
 import dev.portfolio.couponrush.domain.user.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -13,6 +12,8 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
 @Tag(
@@ -47,18 +48,19 @@ public class UserController {
 
     @SecurityRequirement(name = "bearerAuth")
     @Operation(
-            summary = "사용자 단건 조회",
-            description = "사용자 ID로 사용자 정보를 조회함"
+            summary = "내 정보 조회",
+            description = "로그인한 사용자의 정보를 조회함"
     )
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "사용자 조회 성공"),
+            @ApiResponse(responseCode = "200", description = "내 정보 조회 성공"),
+            @ApiResponse(responseCode = "401", description = "인증 필요"),
             @ApiResponse(responseCode = "404", description = "사용자를 찾을 수 없음")
     })
-    @GetMapping("/{userId}")
-    public UserResponse getUser(
-            @Parameter(description = "조회할 사용자 ID", example = "1")
-            @PathVariable Long userId) {
-        log.info("사용자 단건 조회 요청: userId={}", userId);
+    @GetMapping("/me")
+    public UserResponse getMe(@AuthenticationPrincipal Jwt jwt) {
+        Long userId = Long.valueOf(jwt.getSubject());
+
+        log.info("내 정보 조회 요청: userId={}", userId);
         return userService.getUser(userId);
     }
 }
